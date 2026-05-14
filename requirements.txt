@@ -1,0 +1,4 @@
+# To-be services (supply, etc.) + Spark mail ingest
+-r to-be/requirements.txt
+pyspark==3.5.1
+requests>=2.28

@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>To-Be 아키텍처 시연</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #cbd5e1; color: #1e293b; font-family: 'Malgun Gothic', sans-serif; padding: 24px; }
+
+    .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 20px; }
+    .header h1 { font-size: 20px; color: #0f172a; margin-bottom: 4px; }
+    .header p  { font-size: 12px; color: #64748b; }
+    .btn-row { display: flex; gap: 10px; }
+    button { padding: 10px 22px; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; font-weight: bold; }
+    .btn-create { background: #2563eb; color: white; box-shadow: 0 2px 6px rgba(37,99,235,0.3); }
+    .btn-create:hover { background: #1d4ed8; }
+    .btn-create:disabled { background: #93c5fd; color: white; cursor: not-allowed; box-shadow: none; }
+    .btn-reset  { background: #475569; color: #e2e8f0; }
+    .btn-reset:hover { background: #334155; }
+
+    .kpi-row { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+    .kpi-card { background: white; border-radius: 12px; padding: 18px 20px; border-top: 4px solid #e2e8f0; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+    .kpi-card.highlight { border-top-color: #ef4444; }
+    .kpi-card.blue  { border-top-color: #3b82f6; }
+    .kpi-label { font-size: 11px; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+    .kpi-val { font-size: 40px; font-weight: bold; color: #0f172a; line-height: 1; }
+    .kpi-val.danger { color: #ef4444; }
+    .kpi-val.ok    { font-size: 16px; color: #16a34a; font-weight: bold; margin-top: 6px; }
+    .kpi-val.down  { font-size: 16px; color: #ef4444; font-weight: bold; margin-top: 6px; }
+    .kpi-sub { font-size: 11px; color: #94a3b8; margin-top: 6px; line-height: 1.4; }
+
+    .section { background: white; border-radius: 12px; padding: 18px 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 14px; }
+    .section-title { font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 14px; font-weight: bold; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; }
+
+    .events-wrap { display: flex; flex-direction: column; gap: 10px; max-height: 380px; overflow-y: auto; }
+    .event-card { background: #f8fafc; border-radius: 10px; padding: 14px 16px; border: 1px solid #e2e8f0; }
+    .event-card.new { border-color: #93c5fd; background: #eff6ff; animation: slideIn 0.4s ease; }
+    @keyframes slideIn { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+
+    .event-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .event-id { font-size: 13px; font-weight: bold; color: #1d4ed8; }
+    .event-badge { font-size: 11px; background: #fee2e2; color: #dc2626; padding: 3px 10px; border-radius: 999px; font-weight: bold; }
+
+    .event-consumers { display: flex; gap: 8px; }
+    .consumer-chip { flex: 1; background: white; border-radius: 8px; padding: 10px 12px; border: 1px solid #e2e8f0; }
+    .chip-name { font-size: 12px; font-weight: bold; margin-bottom: 3px; }
+    .chip-name.search { color: #2563eb; }
+    .chip-name.mobile { color: #7c3aed; }
+    .chip-name.graph  { color: #059669; }
+    .chip-detail { font-size: 11px; color: #94a3b8; margin-bottom: 4px; }
+    .chip-delay { font-size: 15px; font-weight: bold; }
+    .chip-delay.slow { color: #ef4444; }
+    .chip-delay.ok   { color: #16a34a; }
+
+    .info-box { background: #f0fdf4; border: 1.5px solid #86efac; border-radius: 12px; padding: 16px 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 14px; }
+    .info-title { font-size: 13px; font-weight: bold; color: #166534; margin-bottom: 10px; }
+    .info-items { display: flex; flex-direction: column; gap: 6px; }
+    .info-item { font-size: 12px; color: #64748b; padding-left: 8px; line-height: 1.5; }
+
+    .pain-box { background: #fff5f5; border: 1.5px solid #fca5a5; border-radius: 12px; padding: 16px 18px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+    .pain-title { font-size: 13px; font-weight: bold; color: #dc2626; margin-bottom: 10px; }
+    .pain-items { display: flex; flex-direction: column; gap: 6px; }
+    .pain-item { font-size: 12px; color: #64748b; padding-left: 8px; line-height: 1.5; }
+
+    .empty { font-size: 13px; color: #94a3b8; padding: 12px 0; }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>To-Be 아키텍처 시연 (dl-poc)</h1>
+    <p>공급은 Kafka 수집 토픽(mail.events)에만 발행. 소비는 Kafka 구독 후 — 현재 단계에서는 as-is와 동일하게 공급 GET (다음: mail.ready + 레이크/BFF).</p>
+  </div>
+  <div class="btn-row">
+    <button class="btn-create" id="btn-create" onclick="createMail()">메일 생성</button>
+    <button class="btn-reset" onclick="resetAll()">초기화</button>
+  </div>
+</div>
+
+<div class="info-box">
+  <div class="info-title">To-Be 변경 요약</div>
+  <div class="info-items">
+    <div class="info-item">• 공급: Pub/Sub 3토픽 → <b>Kafka mail.events 1회 발행</b></div>
+    <div class="info-item">• 소비: Pub/Sub 구독 → <b>Kafka mail.events 구독</b> (group 분리)</div>
+    <div class="info-item">• 다음 단계: Spark 적재 후 <b>mail.ready</b> 소비, 공급 직접 GET 제거</div>
+  </div>
+</div>
+
+<div class="kpi-row">
+  <div class="kpi-card highlight">
+    <div class="kpi-label">공급서비스 직접 요청 누적 (임시 — 레이크 전)</div>
+    <div class="kpi-val danger" id="k-direct">0</div>
+    <div class="kpi-sub">최고 동시 처리: <b id="k-active">0</b>건</div>
+  </div>
+  <div class="kpi-card blue">
+    <div class="kpi-label">공급서비스</div>
+    <div class="kpi-val ok" id="k-supply">-</div>
+  </div>
+  <div class="kpi-card blue">
+    <div class="kpi-label">검색서비스 수신</div>
+    <div class="kpi-val" id="k-search">0</div>
+  </div>
+  <div class="kpi-card blue">
+    <div class="kpi-label">모바일서비스 수신</div>
+    <div class="kpi-val" id="k-mobile">0</div>
+  </div>
+  <div class="kpi-card blue">
+    <div class="kpi-label">Graph서비스 수신</div>
+    <div class="kpi-val" id="k-graph">0</div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="section-title">이벤트 기록 — 메일 1건당 공급 직접 요청 3회 (임시, 최신 순)</div>
+  <div class="events-wrap" id="events-wrap">
+    <div class="empty">메일 생성 버튼을 눌러 이벤트를 발생시키세요.</div>
+  </div>
+</div>
+
+<div class="pain-box">
+  <div class="pain-title">아직 남은 as-is 성격</div>
+  <div class="pain-items">
+    <div class="pain-item">• 소비 3개가 여전히 공급 API를 직접 호출 → Spark+Iceberg+mail.ready 붙이면 완화</div>
+    <div class="pain-item">• 수집은 이미 Kafka 단일 토픽으로 정리됨</div>
+  </div>
+</div>
+
+<script>
+  let knownIds = new Set();
+  let allCards = [];
+
+  function parseCards(logs) {
+    const map = {};
+    logs.forEach(log => {
+      if (!log.includes('데이터 수신 완료')) return;
+      const idMatch = log.match(/mail_id=([a-z0-9]+)/);
+      const delayMatch = log.match(/응답시간: ([\d.]+)초/);
+      if (!idMatch || !delayMatch) return;
+      const id = idMatch[1];
+      const delay = parseFloat(delayMatch[1]);
+      if (!map[id]) map[id] = { id, rows: [], isNew: !knownIds.has(id) };
+      if (log.includes('검색')) map[id].rows.push({ name: '검색서비스', cls: 'search', delay });
+      else if (log.includes('모바일')) map[id].rows.push({ name: '모바일서비스', cls: 'mobile', delay });
+      else if (log.includes('Graph')) map[id].rows.push({ name: 'Graph서비스', cls: 'graph', delay });
+      knownIds.add(id);
+    });
+    return Object.values(map).filter(c => c.rows.length > 0);
+  }
+
+  function renderCards(cards) {
+    const wrap = document.getElementById('events-wrap');
+    if (!cards.length) {
+      wrap.innerHTML = '<div class="empty">메일 생성 버튼을 눌러 이벤트를 발생시키세요.</div>';
+      return;
+    }
+    wrap.innerHTML = cards.slice(-10).reverse().map(card => {
+      const chips = card.rows.map(r => `
+        <div class="consumer-chip">
+          <div class="chip-name ${r.cls}">${r.name}</div>
+          <div class="chip-detail">↩ 공급서비스 직접 요청 (임시)</div>
+          <div class="chip-delay ${r.delay >= 0.5 ? 'slow' : 'ok'}">${r.delay}초</div>
+        </div>`).join('');
+      return `
+        <div class="event-card ${card.isNew ? 'new' : ''}">
+          <div class="event-head">
+            <span class="event-id">mail_id: ${card.id}</span>
+            <span class="event-badge">공급 직접 접근 ${card.rows.length}회</span>
+          </div>
+          <div class="event-consumers">${chips}</div>
+        </div>`;
+    }).join('');
+  }
+
+  async function fetchAll() {
+    try {
+      const res = await fetch('/api/all');
+      const data = await res.json();
+
+      document.getElementById('k-direct').textContent = data.supply_stats?.direct_requests ?? 0;
+      document.getElementById('k-active').textContent = data.supply_stats?.peak_active ?? 0;
+      const ss = data.supply || {};
+      const el = document.getElementById('k-supply');
+      el.textContent = ss.status === 'running' ? '정상' : '장애';
+      el.className = 'kpi-val ' + (ss.status === 'running' ? 'ok' : 'down');
+
+      ['search','mobile','graph'].forEach(n => {
+        document.getElementById(`k-${n}`).textContent = data[n]?.received_count ?? 0;
+      });
+
+      allCards = parseCards(data.logs || []);
+      renderCards(allCards);
+    } catch(e) {}
+  }
+
+  function createMail() {
+    fetch('/api/create-mail', { method: 'POST' }).catch(() => {});
+  }
+
+  async function resetAll() {
+    await fetch('/api/reset', { method: 'POST' });
+    knownIds.clear(); allCards = [];
+    renderCards([]);
+    ['k-direct','k-search','k-mobile','k-graph'].forEach(id => document.getElementById(id).textContent = '0');
+  }
+
+  setInterval(fetchAll, 3000);
+  fetchAll();
+</script>
+</body>
+</html>
