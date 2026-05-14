@@ -17,7 +17,8 @@ build/
 .env.*
 *.local
 
-# Spark streaming (local Linux/mac default; Windows uses MinIO path in script)
+# Spark streaming local checkpoint (Linux/mac default under to-be/)
+**/.spark-mail-ingest-cp/
 .spark-mail-ingest-cp/
 
 # IDE / OS

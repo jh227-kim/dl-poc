@@ -2,8 +2,8 @@
 Single-shot: publish one mail event to Kafka (same shape as kafka-smoke).
 
   pip install kafka-python
-  python examples/mail_event_publish.py
-  python examples/mail_event_publish.py --mail-id abc12345 --action created
+  python to-be/examples/mail_event_publish.py
+  python to-be/examples/mail_event_publish.py --mail-id abc12345 --action created
 
 Supply service (FastAPI) should do the equivalent after POST /mails succeeds.
 """

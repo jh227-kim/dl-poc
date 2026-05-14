@@ -1,10 +1,10 @@
 """
 PoC: mail.events (Kafka) -> fetch mail from supply HTTP -> Iceberg local.db.mail_silver -> mail.ready (Kafka).
 
-Prereq: docker compose up -d; to-be supply on 8100; venv with pyspark, kafka-python, requests.
+Prereq: cd to-be && docker compose up -d; supply on 8100; repo-root venv with pyspark, kafka-python, requests.
 
-Run (from dl-poc root):
-  venv\\Scripts\\python spark_ingest_mail.py
+Run (from dl-poc repo root):
+  venv\\Scripts\\python to-be\\spark_ingest_mail.py
 
 Windows: default checkpoint is MinIO s3a://warehouse/.spark-checkpoints/mail-ingest (avoids NativeIO on local disk).
   Override: MAIL_INGEST_CHECKPOINT or SPARK_CHECKPOINT_LOCATION (e.g. file path or another s3a URI).

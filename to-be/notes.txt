@@ -1,9 +1,10 @@
 To-Be (dl-poc): as-is same layout; supply -> Kafka mail.events only.
 
-Prereq: Docker Desktop + from dl-poc root: docker compose up -d
+Prereq: Docker Desktop + from repo root: venv + pip install -r requirements.txt
+Infra: cd to-be && docker compose up -d
 
-Install (use dl-poc venv or a dedicated venv):
-  pip install -r to-be/requirements.txt
+Install (use dl-poc venv at repo root):
+  pip install -r requirements.txt
 
 Ports (defaults, parallel with as-is 8000~):
   supply   http://localhost:8100
@@ -19,34 +20,29 @@ Env (optional):
 
 --- 공급만 + Kafka에서 메시지 보기 (소비 서비스 없음) ---
 
-1) Docker + (선택) 토픽 생성 — mail.events 가 없으면 한 번:
-   cd dl-poc && scripts\kafka-smoke.bat
-   (또는 수동: docker compose exec -T kafka kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic mail.events --partitions 1 --replication-factor 1)
+1) Docker + (선택) 토픽 생성 — mail.events 가 없으면 한 번 (repo root):
+   to-be\scripts\kafka-smoke.bat
+   (또는: cd to-be && docker compose exec -T kafka kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic mail.events --partitions 1 --replication-factor 1)
 
-2) 터미널 A — Kafka tail (메시지 확인):
-   cd dl-poc
+2) 터미널 A — Kafka tail:
+   cd to-be
    docker compose exec -it kafka kafka-console-consumer --bootstrap-server kafka:29092 --topic mail.events --from-beginning
 
 3) 터미널 B — To-Be 공급만:
-   cd dl-poc
-   venv\Scripts\pip install -r to-be\requirements.txt
    cd to-be\supply_service
    ..\..\venv\Scripts\uvicorn main:app --host 0.0.0.0 --port 8100
 
-4) 메일 생성 (브라우저 또는 curl):
+4) 메일 생성:
    curl -X POST http://localhost:8100/mails -H "Content-Type: application/json" -d "{\"title\":\"t\",\"body\":\"b\",\"sender\":\"s@test.com\"}"
 
-터미널 A에 {"mail_id":"...", "action":"created"} 한 줄이 찍히면 수집 Kafka 반영된 것.
+Spark ingest (repo root): venv\Scripts\python to-be\spark_ingest_mail.py
+자세한 절차는 to-be\README.md 참고.
 
 --- 전체 To-Be (대시보드 포함) ---
 
 Run (4 terminals + dashboard):
-  cd to-be\supply_service && uvicorn main:app --host 0.0.0.0 --port 8100
-  cd to-be\search_service  && uvicorn main:app --host 0.0.0.0 --port 8101
-  cd to-be\mobile_service  && uvicorn main:app --host 0.0.0.0 --port 8102
-  cd to-be\graph_service   && uvicorn main:app --host 0.0.0.0 --port 8103
-  cd to-be\dashboard       && uvicorn main:app --host 0.0.0.0 --port 8104
-
-Next steps in code:
-  - Spark reads KAFKA_INGEST_TOPIC, writes Iceberg, then publishes mail.ready
-  - Consumers switch topic to mail.ready and call BFF instead of GET supply
+  cd to-be\supply_service && ..\..\venv\Scripts\uvicorn main:app --host 0.0.0.0 --port 8100
+  cd to-be\search_service  && ..\..\venv\Scripts\uvicorn main:app --host 0.0.0.0 --port 8101
+  cd to-be\mobile_service  && ..\..\venv\Scripts\uvicorn main:app --host 0.0.0.0 --port 8102
+  cd to-be\graph_service   && ..\..\venv\Scripts\uvicorn main:app --host 0.0.0.0 --port 8103
+  cd to-be\dashboard       && ..\..\venv\Scripts\uvicorn main:app --host 0.0.0.0 --port 8104

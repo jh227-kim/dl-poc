@@ -1,19 +1,19 @@
 # Kafka smoke: create mail.events -> produce 1 JSON -> consume 1 message
-# PowerShell:  cd to repo root,  .\scripts\kafka-smoke.ps1
-# CMD:         cd to repo root,  scripts\kafka-smoke.bat  (Bypass execution policy)
-# Prerequisite: docker compose up -d
+# PowerShell:  from repo root,  .\to-be\scripts\kafka-smoke.ps1
+# CMD:         from repo root,  to-be\scripts\kafka-smoke.bat  (Bypass execution policy)
+# Prerequisite: cd to-be && docker compose up -d
 
 $ErrorActionPreference = "Stop"
-$root = Split-Path -Parent $PSScriptRoot
-if (-not (Test-Path (Join-Path $root "docker-compose.yml"))) {
-    throw "docker-compose.yml not found (expected repo root above scripts/)."
+$toBeRoot = Split-Path -Parent $PSScriptRoot
+if (-not (Test-Path (Join-Path $toBeRoot "docker-compose.yml"))) {
+    throw "docker-compose.yml not found (expected to-be/ next to scripts/)."
 }
-Set-Location $root
+Set-Location $toBeRoot
 
 $bootstrap = "kafka:29092"
 $topic = "mail.events"
 
-Write-Host "==> Working directory: $root"
+Write-Host "==> Working directory: $toBeRoot"
 
 Write-Host "==> Delete topic if exists (then recreate so first consume is predictable)"
 $prev = $ErrorActionPreference

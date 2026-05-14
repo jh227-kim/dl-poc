@@ -1,3 +1,9 @@
+"""
+One-off Iceberg + MinIO sanity (creates local.db.poc_table).
+
+Prereq: from repo root, `cd to-be` then `docker compose up -d`.
+Run: `venv\\Scripts\\python to-be\\app.py` (repo root).
+"""
 import os
 import subprocess
 # Hadoop (winutils 등) — Python import 경로에 bin 넣지 않음
