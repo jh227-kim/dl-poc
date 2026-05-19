@@ -260,6 +260,7 @@ def main() -> None:
             sender STRING,
             ingested_at TIMESTAMP
         ) USING iceberg
+        TBLPROPERTIES ('format-version'='2')
         """
     )
 
