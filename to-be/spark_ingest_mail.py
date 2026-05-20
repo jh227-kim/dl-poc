@@ -272,6 +272,7 @@ def main() -> None:
         .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP)
         .option("subscribe", INGEST_TOPIC)
         .option("startingOffsets", "earliest")
+        .option("failOnDataLoss", "false")
         .load()
     )
 
