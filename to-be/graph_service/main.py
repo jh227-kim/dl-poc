@@ -36,7 +36,7 @@ def handle_event(mail_id: str | None, action: str | None) -> None:
         log3 = (
             f"[{SERVICE_LABEL}] 데이터 수신 완료 | mail_id={mail_id} | "
             f"응답시간: {data.get('response_delay_sec', 0):.1f}초 | "
-            f"내용: {data.get('mail', {}).get('body', '')[:15]}..."
+            f"내용: {data}"
         )
         print(log3)
         logs.append(log3)
