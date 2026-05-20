@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
@@ -71,7 +72,6 @@ _DEFAULT_WIN_CHECKPOINT = "s3a://warehouse/.spark-checkpoints/mail-ingest"
 
 _ready_kafka_producer = None
 
-
 def _checkpoint_location() -> str:
     loc = (os.environ.get("MAIL_INGEST_CHECKPOINT") or os.environ.get("SPARK_CHECKPOINT_LOCATION") or "").strip()
     if loc:
@@ -80,12 +80,10 @@ def _checkpoint_location() -> str:
         return _DEFAULT_WIN_CHECKPOINT
     return str(Path(__file__).resolve().parent / ".spark-mail-ingest-cp")
 
-
 def _get_ready_kafka_producer():
     global _ready_kafka_producer
     if _ready_kafka_producer is None:
         from kafka import KafkaProducer
-
         _ready_kafka_producer = KafkaProducer(
             bootstrap_servers=KAFKA_BOOTSTRAP,
             value_serializer=lambda v: json.dumps(v, ensure_ascii=False).encode("utf-8"),
@@ -93,17 +91,27 @@ def _get_ready_kafka_producer():
         )
     return _ready_kafka_producer
 
-
 def _publish_ready(mail_id: str) -> None:
     p = _get_ready_kafka_producer()
     p.send(READY_TOPIC, {"mail_id": mail_id, "status": "ready"})
     p.flush()
-    print(f"[ingest] -> {READY_TOPIC} mail_id={mail_id}")
-
+    print(f"[ingest] -> {READY_TOPIC} 적재 완료 알림 발행 완료 | mail_id={mail_id}")
 
 def _sql_string_literal(value: str) -> str:
     return "'" + str(value).replace("\\", "\\\\").replace("'", "''") + "'"
 
+def _mask_personal_info(text: str) -> str:
+    """간단한 정규식을 사용한 개인정보(이메일, 전화번호) 마스킹 처리 함수"""
+    if not text:
+        return ""
+    # 이메일 마스킹 (ex: abcde@company.com -> ab***@company.com)
+    email_pattern = r'([a-zA-Z0-9_.+-]{2})[a-zA-Z0-9_.+-]+@([a-zA-Z0-9-]+\.[a-zA-Z0-9-. ]+)'
+    text = re.sub(email_pattern, r'\1***@\2', text)
+    
+    # 전화번호 마스킹 (ex: 010-1234-5678 -> 010-****-5678)
+    phone_pattern = r'(\d{2,3})-(\d{3,4})-(\d{4})'
+    text = re.sub(phone_pattern, r'\1-****-\3', text)
+    return text
 
 def _register_mail_batch_view(spark, rows: list[tuple[str, str, str, str]]) -> None:
     """Avoid spark.createDataFrame for batch rows: Iceberg write + PySpark local worker often crashes on Windows."""
@@ -130,7 +138,6 @@ def _register_mail_batch_view(spark, rows: list[tuple[str, str, str, str]]) -> N
         """
     )
 
-
 def process_batch(df, epoch_id: int) -> None:
     import requests
     from pyspark.sql import functions as F
@@ -140,6 +147,8 @@ def process_batch(df, epoch_id: int) -> None:
         return
 
     rows_out: list[tuple[str, str, str, str]] = []
+    success_ids: list[str] = []
+
     for row in df.select(F.col("value").cast("string").alias("json")).collect():
         try:
             payload = json.loads(row.json)
@@ -158,29 +167,35 @@ def process_batch(df, epoch_id: int) -> None:
         if data.get("error"):
             print(f"[ingest] supply error mail_id={mid}: {data}")
             continue
+            
         mail = data.get("mail") or {}
-        rows_out.append(
-            (
-                str(mid),
-                str(mail.get("title") or ""),
-                str(mail.get("body") or ""),
-                str(mail.get("sender") or ""),
-            )
-        )
-        _publish_ready(mid)
-        print(f"[ingest] iceberg row mail_id={mid} action={act} epoch={epoch_id}")
+        
+        # 3단계: 개인정보 보호를 위한 데이터 비식별화 가공 처리 진행
+        masked_title = _mask_personal_info(str(mail.get("title") or ""))
+        masked_body = _mask_personal_info(str(mail.get("body") or ""))
+        masked_sender = _mask_personal_info(str(mail.get("sender") or ""))
+
+        rows_out.append((str(mid), masked_title, masked_body, masked_sender))
+        success_ids.append(str(mid))
+        print(f"[ingest] 가공 완료 (메모리 적재) mail_id={mid} action={act} epoch={epoch_id}")
 
     if not rows_out:
         return
 
+    # 4단계: 가공 데이터 Iceberg 테이블 멱등성 저장
     _register_mail_batch_view(spark, rows_out)
     # idempotent-ish: delete same mail_id then insert (no Iceberg MERGE SQL extension required)
-    ids = ",".join("'" + m.replace("'", "''") + "'" for m, _, _, _ in rows_out)
+    ids = ",".join("'" + m.replace("'", "''") + "'" for m in success_ids)
     spark.sql(f"DELETE FROM local.db.mail_silver WHERE mail_id IN ({ids})")
     spark.sql(
         "INSERT INTO local.db.mail_silver (mail_id, title, body, sender, ingested_at) "
         "SELECT mail_id, title, body, sender, ingested_at FROM _mail_batch"
     )
+    print(f"[ingest] Iceberg 테이블 저장 트랜잭션 완료 완료. 총 건수: {len(rows_out)}")
+
+    # 5단계: Iceberg 적재 확정 후, 후속 소비 시스템을 위한 알림 토픽 일괄 발행 수행
+    for valid_id in success_ids:
+        _publish_ready(valid_id)
 
 
 def main() -> None:
@@ -245,6 +260,7 @@ def main() -> None:
             sender STRING,
             ingested_at TIMESTAMP
         ) USING iceberg
+        TBLPROPERTIES ('format-version'='2')
         """
     )
 
@@ -256,6 +272,8 @@ def main() -> None:
         .option("kafka.bootstrap.servers", KAFKA_BOOTSTRAP)
         .option("subscribe", INGEST_TOPIC)
         .option("startingOffsets", "earliest")
+        .option("failOnDataLoss", "false")
+        .option("allowAutomaticTopicCreation", "true")
         .load()
     )
 
@@ -268,7 +286,6 @@ def main() -> None:
     )
     print(">>> streaming (Ctrl+C to stop)")
     q.awaitTermination()
-
 
 if __name__ == "__main__":
     main()
