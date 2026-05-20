@@ -273,6 +273,7 @@ def main() -> None:
         .option("subscribe", INGEST_TOPIC)
         .option("startingOffsets", "earliest")
         .option("failOnDataLoss", "false")
+        .option("allowAutomaticLengthCheck", "true")
         .load()
     )
 
