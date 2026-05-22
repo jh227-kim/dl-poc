@@ -35,8 +35,32 @@ app = FastAPI(title="공급서비스 (To-Be) - Kafka 수집", lifespan=lifespan)
 stats = {"total_requests": 0, "direct_requests": 0, "active_requests": 0, "peak_active": 0}
 
 mail_db = {
-    "1": {"id": "1", "title": "회의 안내", "body": "내일 오전 10시 회의가 있습니다.", "sender": "hong@company.com"},
-    "2": {"id": "2", "title": "프로젝트 공유", "body": "첨부 문서를 확인해주세요.", "sender": "kim@company.com"},
+    "1": {
+        "id": "1",
+        "title": "회의 안내",
+        "body": "내일 오전 10시 회의가 있습니다.",
+        "sender": "hong@company.com",
+        "sender_name": "홍길동",
+        "receiver": "kim@company.com",
+        "receiver_name": "김철수",
+        "cc": "lee@company.com",
+        "sent_at": "2025-05-21T09:00:00",
+        "read_yn": False,
+        "has_attachment": False,
+    },
+    "2": {
+        "id": "2",
+        "title": "프로젝트 공유",
+        "body": "첨부 문서를 확인해주세요.",
+        "sender": "kim@company.com",
+        "sender_name": "김철수",
+        "receiver": "hong@company.com",
+        "receiver_name": "홍길동",
+        "cc": "",
+        "sent_at": "2025-05-21T10:30:00",
+        "read_yn": True,
+        "has_attachment": True,
+    },
 }
 
 
@@ -44,11 +68,13 @@ class MailCreate(BaseModel):
     title: str
     body: str
     sender: str
-
-
-def _mail_payload(mail: MailCreate, mail_id: str) -> dict:
-    data = mail.model_dump() if hasattr(mail, "model_dump") else mail.dict()
-    return {"id": mail_id, **data}
+    sender_name: str = ""
+    receiver: str = ""
+    receiver_name: str = ""
+    cc: str = ""
+    sent_at: str | None = None
+    read_yn: bool = False
+    has_attachment: bool = False
 
 
 def publish_event(mail_id: str, action: str) -> None:
@@ -93,7 +119,8 @@ async def get_mail(mail_id: str):
 @app.post("/mails")
 def create_mail(mail: MailCreate):
     mail_id = str(uuid.uuid4())[:8]
-    mail_db[mail_id] = _mail_payload(mail, mail_id)
+    data = mail.model_dump() if hasattr(mail, "model_dump") else mail.dict()
+    mail_db[mail_id] = {"id": mail_id, **data}
     print(f"[공급서비스 To-Be] 메일 생성 | mail_id={mail_id}")
     publish_event(mail_id, "created")
     return {"mail_id": mail_id, "message": "생성 완료, Kafka 수집 토픽에 발행됨"}
@@ -111,6 +138,18 @@ def reset_stats():
     stats["active_requests"] = 0
     stats["peak_active"] = 0
     mail_db.clear()
-    mail_db["1"] = {"id": "1", "title": "회의 안내", "body": "내일 오전 10시 회의가 있습니다.", "sender": "hong@company.com"}
-    mail_db["2"] = {"id": "2", "title": "프로젝트 공유", "body": "첨부 문서를 확인해주세요.", "sender": "kim@company.com"}
+    mail_db["1"] = {
+        "id": "1", "title": "회의 안내", "body": "내일 오전 10시 회의가 있습니다.",
+        "sender": "hong@company.com", "sender_name": "홍길동",
+        "receiver": "kim@company.com", "receiver_name": "김철수",
+        "cc": "lee@company.com", "sent_at": "2025-05-21T09:00:00",
+        "read_yn": False, "has_attachment": False,
+    }
+    mail_db["2"] = {
+        "id": "2", "title": "프로젝트 공유", "body": "첨부 문서를 확인해주세요.",
+        "sender": "kim@company.com", "sender_name": "김철수",
+        "receiver": "hong@company.com", "receiver_name": "홍길동",
+        "cc": "", "sent_at": "2025-05-21T10:30:00",
+        "read_yn": True, "has_attachment": True,
+    }
     return {"message": "통계 초기화 완료"}
