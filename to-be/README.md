@@ -4,12 +4,17 @@
 
 **Docker Desktop**이 필요합니다. 설치·기동은 저장소 **루트 `README.md`**의 Docker Desktop 절을 참고하세요.
 
+## 데이터 레이크 ingest 구조
+
+adapter / 공통 ingest 파이프라인 / 새 도메인 추가 방법은 **[datalake/README.md](datalake/README.md)** 를 참고하세요.
+
 ## 이 폴더에 있는 것
 
 | 경로 | 설명 |
 |------|------|
 | `docker-compose.yml` | MinIO(9000), Postgres(5432), Kafka(9092), Zookeeper |
-| `spark_ingest_mail.py` | Structured Streaming ingest |
+| `spark_ingest_mail.py` | Structured Streaming ingest (메일 진입점) |
+| `datalake/` | adapter, ingest_core, layers — [README](datalake/README.md) |
 | `serving_service/` | 자바(Spark) 없이 Python 네이티브(PyIceberg)로 MinIO Parquet 데이터를 직접 조회하는 서빙 레이어 |
 | `app.py` | Iceberg/MinIO 연결만 빠르게 검증할 때 (선택) |
 | `examples/mail_event_publish.py` | Kafka에 이벤트 한 건 발행 (선택) |
