@@ -119,6 +119,11 @@ venv\Scripts\python to-be\app.py
 | `MAIL_INGEST_CHECKPOINT` | (플랫폼별) | Spark 체크포인트 URI |
 |`ICEBERG_CATALOG_URI`|`postgresql://admin:password@localhost:5432/iceberg_catalog`|카탈로그 메타데이터 상태 관리 DB 주소|
 |`MINIO_ENDPOINT`|`http://127.0.0.1:9000`|물리 데이터 저장 레이어 (Parquet IO 대상)|
+|`SPARK_STREAM_MAX_OFFSETS_PER_TRIGGER` | `5000` | 마이크로 배치(Trigger)가 Kafka에서 읽어올 최대 메시지 개수 |
+|`DL_LIMITER_INITIAL_RPS` | `50` | SUPPLY_SERVICE 초당 호출 제한 시작값 |
+|`DL_LIMITER_MIN_RPS` | `5` |  SUPPLY_SERVICE 초당 호출 최소 |
+|`DL_LIMITER_MAX_RPS` | `200` | SUPPLY_SERVICE 초당 호출 제한 최대  |
+
 
 ## Windows 참고
 

@@ -4,10 +4,52 @@ from __future__ import annotations
 
 import json
 from typing import Callable
+import time
+import os
 
 from datalake.adapters.base import SupplyAdapter
 
 _ready_kafka_producers: dict[tuple[str, str], object] = {}
+
+
+class DynamicRateLimiter:
+    """
+    SUPPLY_SERVICE의 상태(지연, 에러)를 감지하여 
+    호출 속도를 실시간으로 동적 튜닝하는 제어기.
+    """
+    def __init__(self, initial_rps=None, min_rps=None, max_rps=None):
+        if initial_rps is not None:
+            self.rps = int(initial_rps)
+        else:
+            self.rps = int(os.getenv("DL_LIMITER_INITIAL_RPS", "50"))
+
+        if min_rps is not None:
+            self.min_rps = int(min_rps)
+        else:
+            self.min_rps = int(os.getenv("DL_LIMITER_MIN_RPS", "5"))
+
+        if max_rps is not None:
+            self.max_rps = int(max_rps)
+        else:
+            self.max_rps = int(os.getenv("DL_LIMITER_MAX_RPS", "200"))
+
+        self.last_update = time.time()
+
+    def throttle(self):
+        # 현재 설정된 RPS에 맞춰 의도적인 대기 시간(Sleep)을 발생.
+        sleep_time = 1.0 / max(self.rps, self.min_rps)
+        time.sleep(sleep_time)
+
+    def report_success(self):
+        # 정상 작동 시 1초마다 RPS를 조금씩 올림.
+        if time.time() - self.last_update > 1.0:
+            self.rps = min(self.rps + 2, self.max_rps)
+            self.last_update = time.time()
+
+    def report_failure_or_latency(self):
+        # 타임아웃이나 과부하 에러 발생 시 속도를 반(50%)으로 줄임.
+        self.rps = max(int(self.rps * 0.5), self.min_rps)
+        self.last_update = time.time()
 
 
 def _get_ready_kafka_producer(bootstrap_servers: str, ready_topic: str):
@@ -47,6 +89,9 @@ def process_batch(
     epoch_id: int,
 ) -> None:
     from pyspark.sql import functions as F
+    
+    # SUPPLY_SERVICE에 부담을 주지 않도록 호출 사이에 대기 시간 삽입을 위한 동적 제어기 초기화
+    limiter = DynamicRateLimiter()
 
     spark = df.sparkSession
     if df.isEmpty():
@@ -75,6 +120,7 @@ def process_batch(
     candidate_rows: list[dict] = []
     notifications: list[tuple[str, str]] = []
 
+
     for event in events:
         entity_id = event[adapter.entity_id_field]
         if adapter.is_delete(event):
@@ -82,10 +128,15 @@ def process_batch(
             notifications.append((entity_id, "deleted"))
             continue
 
+        limiter.throttle() # SUPPLY_SERVICE에 부담을 주지 않도록 호출 사이에 대기 시간 삽입
+
         body, fetch_quarantine = adapter.fetch_from_supply(event)
-        if fetch_quarantine is not None:
+        if fetch_quarantine is not None:            
+            limiter.report_failure_or_latency() # 실패 혹은 과부하 시 감속 피드백
             quarantine_rows.append(fetch_quarantine)
             continue
+        else:            
+            limiter.report_success() # 성공 시 가속 피드백
 
         valid, reason = adapter.validate_raw(body)
         if not valid:
