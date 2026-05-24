@@ -96,6 +96,9 @@ def create_spark_session(app_name: str, *, enable_iceberg_sql_extensions: bool =
         .config("spark.python.worker.reuse", "true")
         .config("spark.network.timeout", "120s")
         .config("spark.sql.execution.arrow.pyspark.enabled", "false")
+        .config("spark.streaming.backpressure.enabled", "true")
+        .config("spark.streaming.backpressure.initialRate", "1000")
+        .config("spark.streaming.kafka.maxRatePerPartition", "1000")
     )
 
     if enable_iceberg_sql_extensions:

@@ -15,9 +15,11 @@ def run_streaming_ingest(
     checkpoint: str,
     kafka_bootstrap: str | None = None,
     trigger_sec: str | None = None,
+    max_offsets_per_trigger: int | None = None,
 ) -> None:
     bootstrap = kafka_bootstrap or os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
     trigger = trigger_sec or os.environ.get("SPARK_STREAM_TRIGGER_SEC", "5")
+    max_offsets = max_offsets_per_trigger or int(os.environ.get("SPARK_STREAM_MAX_OFFSETS_PER_TRIGGER", "5000"))
 
     app_name = f"{adapter.source}-ingest"
     spark = create_spark_session(app_name)
@@ -33,6 +35,7 @@ def run_streaming_ingest(
         .option("startingOffsets", "earliest")
         .option("failOnDataLoss", "false")
         .option("allowAutomaticTopicCreation", "true")
+        .option("maxOffsetsPerTrigger", max_offsets)
         .load()
     )
 
