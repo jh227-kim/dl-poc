@@ -25,6 +25,11 @@ class SupplyAdapter(ABC):
         ...
 
     @property
+    def dlq_topic(self) -> str | None:
+        """이 어댑터가 처리 도중 에러가 난 이벤트를 전송할 Kafka DLQ 토픽. None이면 비활성화."""
+        return None
+
+    @property
     @abstractmethod
     def entity_id_field(self) -> str:
         """ready 알림 payload 키 (예: mail_id)."""

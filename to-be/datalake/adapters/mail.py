@@ -30,11 +30,13 @@ class MailAdapter(SupplyAdapter):
         supply_url: str | None = None,
         ingest_topic: str | None = None,
         ready_topic: str | None = None,
+        dlq_topic: str | None = None,
         source: str = "mail-supply-default",
     ) -> None:
         self._supply_url = (supply_url or os.environ.get("SUPPLY_SERVICE_URL", "http://127.0.0.1:8100")).rstrip("/")
         self._ingest_topic = ingest_topic or os.environ.get("KAFKA_INGEST_TOPIC", "mail.events")
         self._ready_topic = ready_topic or os.environ.get("KAFKA_READY_TOPIC", "mail.ready")
+        self._dlq_topic = dlq_topic or os.environ.get("KAFKA_DLQ_TOPIC", "mail.events.dlq")
         self._source = source
 
     @property
@@ -48,6 +50,10 @@ class MailAdapter(SupplyAdapter):
     @property
     def ready_topic(self) -> str:
         return self._ready_topic
+
+    @property
+    def dlq_topic(self) -> str | None:
+        return self._dlq_topic
 
     @property
     def entity_id_field(self) -> str:
