@@ -116,19 +116,11 @@ to-be\scripts\kafka-smoke.bat
 
 
 
-## end-to-end 최소 흐름 테스트 (터미널 2개 필요)
+## end-to-end 최소 흐름 테스트 (터미널 1개 필요)
 
-소비시스템 Mock들이 Kafka의 `mail.ready` 알림을 받으면 즉시 **게이트웨이(Kong)를 거쳐 데이터 서빙 레이어(`serving_service`)에 실제 데이터를 요청**합니다. 공급 Mock 서비스(`supply-mock-service`)는 Docker Compose로 이미 기동(Port 8100)되어 있으므로 수동으로 띄울 필요가 없습니다. 전체 E2E 흐름을 검증하기 위해서는 로컬에서 **`serving_service`**만 추가로 기동하면 됩니다.
+소비시스템 Mock들이 Kafka의 `mail.ready` 알림을 받으면 즉시 **게이트웨이(Kong)를 거쳐 데이터 서빙 레이어(`serving_service`)에 실제 데이터를 요청**합니다. `serving_service`를 포함한 모든 서비스들이 Docker Compose를 통해 백그라운드 컨테이너(Port 8105)로 구동 중이므로, 로컬 터미널에서는 Spark 수집 엔진만 가동해 주면 됩니다.
 
-### 1) 데이터 서빙 서비스 기동 (Port 8105)
-*이 서비스가 켜져 있어야 Mock 서비스들이 게이트웨이를 통해 메일 상세 내용을 조회할 수 있습니다.*
-
-```bat
-cd /d path\to\dl-poc\to-be\serving_service
-..\..\venv\Scripts\uvicorn main:app --host 0.0.0.0 --port 8105
-```
-
-### 3) Spark Ingest 실행 (메일 수집 엔진)
+### 1) Spark Ingest 실행 (메일 수집 엔진)
 
 **저장소 루트**에서:
 
@@ -141,7 +133,7 @@ venv\Scripts\python to-be\spark_ingest_mail.py
 - **Windows**: 기본 체크포인트는 MinIO `s3a://warehouse/.spark-checkpoints/mail-ingest` (로그에 `>>> checkpoint:`).
 - **Linux/macOS**: 기본은 이 폴더 아래 `.spark-mail-ingest-cp/`.
 
-### 4) 메일 생성 (E2E 테스트 트리거)
+### 2) 메일 생성 (E2E 테스트 트리거)
 
 ```bat
 curl -X POST http://localhost:8100/mails -H "Content-Type: application/json" -d "{\"title\":\"t\",\"body\":\"b\",\"sender\":\"s@test.com\",\"receiver\":\"r@test.com\"}"
@@ -195,14 +187,7 @@ venv\Scripts\python to-be\app.py
 
 ## 전체 To-Be 서비스 기동 요약 (대시보드 포함)
 
-**`supply_mock_service`, `search_service`, `mobile_service`, `graph_service` 4종 및 `dashboard`는 `docker compose up -d`를 통해 백그라운드 컨테이너로 항상 작동**하므로, 로컬 터미널에서 수동으로 띄울 필요가 없습니다.
-
-로컬 터미널에서 추가로 기동할 서비스는 데이터 서빙 레이어만 있습니다:
-
-```bat
-# 데이터 서빙 레이어 (Port 8105)
-cd to-be\serving_service && ..\..\venv\Scripts\uvicorn main:app --host 0.0.0.0 --port 8105
-```
+**`serving-service`, `supply-mock-service`, `search-consumer-mock`, `mobile-consumer-mock`, `graph-consumer-mock` 및 `dashboard`는 `docker compose up -d`를 통해 백그라운드 컨테이너로 항상 작동**하므로, 로컬 터미널에서 수동으로 임의의 서비스를 직접 띄울 필요가 전혀 없습니다.
 
 기동 후 [대시보드(http://localhost:8104)](http://localhost:8104)에 접속하면, Docker Compose 내부에서 수신되는 소비시스템들의 실시간 로그 수신 상태 및 공급 통계를 직관적으로 모니터링할 수 있습니다.
 

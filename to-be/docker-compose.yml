@@ -145,7 +145,25 @@ services:
       - kafka
     restart: always
 
-  # 5. Monitoring Dashboard (대시보드 서비스)
+  # 5. Data Serving Service (데이터 서빙 서비스)
+  serving-service:
+    build:
+      context: ./
+      dockerfile: serving_service/Dockerfile
+    image: serving-service:latest
+    container_name: serving-service
+    ports:
+      - "8105:8000"
+    environment:
+      - ICEBERG_CATALOG_URI=postgresql://admin:password@postgres:5432/iceberg_catalog
+      - MINIO_ENDPOINT=http://minio:9000
+      - SERVING_PRIVILEGED_KEY=super-secret-privileged-key
+    depends_on:
+      - postgres
+      - minio
+    restart: always
+
+  # 6. Monitoring Dashboard (대시보드 서비스)
   dashboard:
     build:
       context: ./dashboard
@@ -164,6 +182,7 @@ services:
       - mobile-consumer-mock
       - graph-consumer-mock
     restart: always
+
 
 
 volumes:

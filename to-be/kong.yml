@@ -4,7 +4,7 @@ _transform: true
 # 1. Services & Routes with Role-Based ACL Authorization
 services:
   - name: serving-service
-    url: http://host.docker.internal:8105
+    url: http://serving-service:8000
     routes:
       # [API 1] Mail Service API - Protected by Key-Auth and ACL
       - name: mails-route
