@@ -144,7 +144,7 @@ venv\Scripts\python to-be\spark_ingest_mail.py
 ### 4) 메일 생성 (E2E 테스트 트리거)
 
 ```bat
-curl -X POST http://localhost:8100/mails -H "Content-Type: application/json" -d "{\"title\":\"t\",\"body\":\"b\",\"sender\":\"s@test.com\"}"
+curl -X POST http://localhost:8100/mails -H "Content-Type: application/json" -d "{\"title\":\"t\",\"body\":\"b\",\"sender\":\"s@test.com\",\"receiver\":\"r@test.com\"}"
 ```
 
 ### (선택) Kafka tail

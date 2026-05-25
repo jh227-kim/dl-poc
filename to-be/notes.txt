@@ -33,7 +33,7 @@ Env (optional):
    ..\..\venv\Scripts\uvicorn main:app --host 0.0.0.0 --port 8100
 
 4) 메일 생성:
-   curl -X POST http://localhost:8100/mails -H "Content-Type: application/json" -d "{\"title\":\"t\",\"body\":\"b\",\"sender\":\"s@test.com\"}"
+   curl -X POST http://localhost:8100/mails -H "Content-Type: application/json" -d "{\"title\":\"t\",\"body\":\"b\",\"sender\":\"s@test.com\",\"receiver\":\"r@test.com\"}"
 
 Spark ingest (repo root): venv\Scripts\python to-be\spark_ingest_mail.py
 자세한 절차는 to-be\README.md 참고.
