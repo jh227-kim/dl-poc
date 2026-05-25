@@ -205,6 +205,19 @@ services:
       - SUPPLY_SERVICE_URL=http://supply-mock-service:8000
     restart: always
 
+  # 8. Spark DLQ Processor (실시간 DLQ 자동 재처리 데몬)
+  spark-dlq-processor:
+    build:
+      context: ./
+      dockerfile: Dockerfile.spark
+    container_name: spark-dlq-processor
+    command: ["python3", "spark_dlq_processor.py"]
+    depends_on:
+      - kafka
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+    restart: always
+
 volumes:
   minio_data:
   zookeeper_data:

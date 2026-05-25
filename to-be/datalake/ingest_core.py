@@ -82,6 +82,47 @@ def _publish_ready(
     )
 
 
+def _publish_dlq(
+    adapter: SupplyAdapter,
+    kafka_bootstrap: str,
+    quarantine_rows: list[dict],
+) -> None:
+    dlq_topic = getattr(adapter, "dlq_topic", None)
+    if not dlq_topic:
+        return
+
+    producer = _get_ready_kafka_producer(kafka_bootstrap, dlq_topic)
+    for row in quarantine_rows:
+        entity_id = row.get(adapter.entity_id_field)
+        key_bytes = str(entity_id).encode("utf-8") if entity_id is not None else None
+
+        orig_payload = row.get("payload_json")
+        retry_count = 0
+        if isinstance(orig_payload, dict):
+            retry_count = orig_payload.get("_retry_count", 0)
+        elif isinstance(orig_payload, str):
+            try:
+                parsed_orig = json.loads(orig_payload)
+                if isinstance(parsed_orig, dict):
+                    retry_count = parsed_orig.get("_retry_count", 0)
+            except Exception:
+                pass
+
+        payload = {
+            "timestamp": float(time.time()),
+            "adapter_source": adapter.source,
+            "entity_id": entity_id,
+            "action": row.get("action"),
+            "payload_json": orig_payload,
+            "raw_mail_json": row.get("raw_mail_json"),
+            "validation_error": row.get("validation_error"),
+            "retry_count": retry_count,
+        }
+        producer.send(dlq_topic, key=key_bytes, value=payload)
+    producer.flush()
+    print(f"[ingest] -> {dlq_topic} DLQ 메시지 {len(quarantine_rows)}건 발행 완료 (Key 보존, retry_count={retry_count})")
+
+
 def process_batch(
     adapter: SupplyAdapter,
     kafka_bootstrap: str,
@@ -112,6 +153,7 @@ def process_batch(
     events = adapter.dedupe_events(parsed_events)
     if not events and quarantine_rows:
         adapter.save_quarantine(spark, quarantine_rows)
+        _publish_dlq(adapter, kafka_bootstrap, quarantine_rows)
         return
     if not events:
         return
@@ -168,6 +210,7 @@ def process_batch(
 
     if quarantine_rows:
         adapter.save_quarantine(spark, quarantine_rows)
+        _publish_dlq(adapter, kafka_bootstrap, quarantine_rows)
 
     for entity_id, status in notifications:
         _publish_ready(adapter, kafka_bootstrap, entity_id, status=status)
