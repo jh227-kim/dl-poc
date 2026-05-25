@@ -56,6 +56,22 @@ services:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
 
+  api-gateway:
+    image: kong:latest
+    container_name: api-gateway
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /usr/local/kong/kong.yml
+      KONG_PROXY_LISTEN: 0.0.0.0:8106
+      KONG_LOG_LEVEL: info
+    ports:
+      - "8106:8106"
+    volumes:
+      - ./kong.yml:/usr/local/kong/kong.yml
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: always
+
 volumes:
   minio_data:
   zookeeper_data:

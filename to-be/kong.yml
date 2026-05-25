@@ -1,0 +1,84 @@
+_format_version: "3.0"
+_transform: true
+
+# 1. Services & Routes with Role-Based ACL Authorization
+services:
+  - name: serving-service
+    url: http://host.docker.internal:8105
+    routes:
+      # [API 1] Mail Service API - Protected by Key-Auth and ACL
+      - name: mails-route
+        paths:
+          - /mails
+        strip_path: false
+        plugins:
+          - name: key-auth
+            config:
+              key_names:
+                - apikey
+          - name: acl
+            config:
+              allow:
+                - mails-group
+
+      # [API 2] User Service API (For future expansion)
+      - name: users-route
+        paths:
+          - /users
+        strip_path: false
+        plugins:
+          - name: key-auth
+            config:
+              key_names:
+                - apikey
+          - name: acl
+            config:
+              allow:
+                - users-group
+
+      # [API 3] Statistics Service API (For future expansion)
+      - name: statistics-route
+        paths:
+          - /statistics
+        strip_path: false
+        plugins:
+          - name: key-auth
+            config:
+              key_names:
+                - apikey
+          - name: acl
+            config:
+              allow:
+                - admin-group
+
+# 2. Consumers, API Keys & Group Assignments (ACLs)
+consumers:
+  - username: mobile_service_client
+    keyauth_credentials:
+      - key: mobile-secret-key-123
+    acls:
+      - group: mails-group   # Has access to Mails API
+      - group: users-group   # Has access to Users API
+
+  - username: search_service_client
+    keyauth_credentials:
+      - key: search-secret-key-456
+    acls:
+      - group: mails-group   # Has access to Mails API
+      - group: users-group   # Has access to Users API as well (Granted to Mobile & Search)
+
+  - username: graph_service_client
+    keyauth_credentials:
+      - key: graph-secret-key-789
+    acls:
+      - group: mails-group   # Has access to Mails API
+      - group: admin-group   # Has access to Statistics API
+
+# 3. Privilege Authorization (x-consumer-privileged-key Injection)
+plugins:
+  - name: request-transformer
+    consumer: mobile_service_client
+    config:
+      add:
+        headers:
+          - "x-consumer-privileged-key:super-secret-privileged-key"

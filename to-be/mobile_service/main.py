@@ -12,7 +12,8 @@ SERVICE_LABEL = "모바일서비스"
 CONSUMER_GROUP = os.environ.get("KAFKA_CONSUMER_GROUP", "mobile-to-be")
 KAFKA_BOOTSTRAP = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
 KAFKA_READY_TOPIC = os.environ.get("KAFKA_READY_TOPIC", "mail.ready")
-SERVING_SERVICE_URL = os.environ.get("SERVING_SERVICE_URL", "http://localhost:8105")
+SERVING_SERVICE_URL = os.environ.get("SERVING_SERVICE_URL", "http://localhost:8106")
+API_KEY = os.environ.get("MY_API_KEY", "mobile-secret-key-123")
 AUTO_OFFSET = os.environ.get("KAFKA_AUTO_OFFSET_RESET", "latest")
 
 app = FastAPI(title=f"{SERVICE_LABEL} (To-Be)")
@@ -30,7 +31,8 @@ def handle_event(mail_id: str | None, action: str | None) -> None:
     logs.append(log2)
 
     try:
-        response = httpx.get(f"{SERVING_SERVICE_URL}/mails/{mail_id}", timeout=10)
+        headers = {"apikey": API_KEY}
+        response = httpx.get(f"{SERVING_SERVICE_URL}/mails/{mail_id}", headers=headers, timeout=10)
         data = response.json()
         received_data.append(data)
         log3 = (
