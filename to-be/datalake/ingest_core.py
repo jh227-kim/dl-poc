@@ -194,7 +194,21 @@ def process_batch(
             )
             continue
 
-        standardized = adapter.to_canonical(body, event)
+        refined, refine_error = adapter.refine_raw(body)
+        if refine_error:
+            mail = (body or {}).get("mail") or {}
+            quarantine_rows.append(
+                adapter.build_quarantine_row(
+                    entity_id,
+                    "UPSERT",
+                    event["payload"],
+                    mail,
+                    refine_error,
+                )
+            )
+            continue
+
+        standardized = adapter.to_canonical(refined, event)
         encrypted = adapter.encrypt_canonical(standardized)
         candidate_rows.append(encrypted)
         notifications.append((entity_id, "ready"))

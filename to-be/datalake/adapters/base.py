@@ -54,6 +54,10 @@ class SupplyAdapter(ABC):
     def validate_raw(self, raw: dict) -> tuple[bool, str | None]:
         ...
 
+    def refine_raw(self, raw: dict) -> tuple[dict, str | None]:
+        """validate 이후 to_canonical 이전 정제. 기본은 no-op."""
+        return raw, None
+
     @abstractmethod
     def to_canonical(self, raw: dict, event: dict) -> dict:
         ...
@@ -100,5 +104,5 @@ class SupplyAdapter(ABC):
     def stream_description(self, kafka_bootstrap: str) -> str:
         return (
             f"{self.ingest_topic} @ {kafka_bootstrap} -> supply -> "
-            f"validate/encrypt -> silver,gold/quarantine -> {self.ready_topic}"
+            f"validate/refine/encrypt -> silver,gold/quarantine -> {self.ready_topic}"
         )

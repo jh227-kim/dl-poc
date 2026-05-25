@@ -20,6 +20,7 @@ from datalake.layers import (
     save_to_quarantine,
     save_to_silver,
 )
+from datalake.refiners.mail import refine_mail_raw
 from datalake.validator import validate_mail
 
 
@@ -122,6 +123,9 @@ class MailAdapter(SupplyAdapter):
     def validate_raw(self, raw: dict) -> tuple[bool, str | None]:
         mail = raw.get("mail") or {}
         return validate_mail(mail)
+
+    def refine_raw(self, raw: dict) -> tuple[dict, str | None]:
+        return refine_mail_raw(raw)
 
     def to_canonical(self, raw: dict, event: dict) -> dict:
         mail = raw.get("mail") or {}

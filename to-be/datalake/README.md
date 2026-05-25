@@ -40,7 +40,7 @@ To-Be 데이터 레이크 **ingest** 코드는 `datalake/` 아래에 모여 있�
             → {Domain}Adapter
             → ingest_runner → ingest_core
                 → Supply HTTP Pull
-                → validate → encrypt → silver/gold (또는 quarantine)
+                → validate → refine → encrypt → silver/gold (또는 quarantine)
             → Kafka {domain}.ready
                 → 소비 서비스 → Serving GET
 ```
@@ -60,7 +60,7 @@ Supply(8100) → mail.events → spark_ingest_mail.py → MailAdapter
 |------|------|
 | `adapters/base.py` | `SupplyAdapter` 인터페이스 |
 | `adapters/common.py` | event action / version / datetime 공통 파싱 |
-| `adapters/mail.py` | 메일 Supply Pull, validate, canonical, encrypt, stale |
+| `adapters/mail.py` | 메일 Supply Pull, validate, refine, canonical, encrypt, stale |
 | `ingest_core.py` | `process_batch` — adapter 주입 **공통 파이프라인** |
 | `ingest_runner.py` | Kafka readStream + foreachBatch 기동 |
 | `spark_runtime.py` | SparkSession, Iceberg catalog, MinIO 공통 설정 |
@@ -69,6 +69,7 @@ Supply(8100) → mail.events → spark_ingest_mail.py → MailAdapter
 | `layers/mail.py` | `local.silver/gold/quarantine.mail` DDL·저장 |
 | `encryption.py` | PII 필드 AES-256-GCM |
 | `validator.py` | 메일 검증 (향후 `validators/{domain}.py` 분리 가능) |
+| `refiners/mail.py` | 메일 HTML/MIME 본문 정제 |
 | `../spark_ingest_mail.py` | **메일 ingest 진입점** (`to-be/` 아래) |
 
 **import 호환:** `from datalake.layers import save_to_silver` — `layers/__init__.py`가 `layers/mail.py`를 re-export 합니다.
@@ -84,11 +85,12 @@ Supply(8100) → mail.events → spark_ingest_mail.py → MailAdapter
 3. `adapter.is_delete` → `adapter.delete_entities`
 4. UPSERT → `adapter.fetch_from_supply` (**Supply HTTP Pull**)
 5. `adapter.validate_raw` — 실패 시 quarantine
-6. `adapter.to_canonical` → `adapter.encrypt_canonical`
-7. `adapter.drop_stale` — stale는 quarantine
-8. `adapter.save_accepted` (silver + gold)
-9. `adapter.save_quarantine`
-10. `adapter.ready_payload` → Kafka ready 토픽 publish
+6. `adapter.refine_raw` — HTML/MIME 정제 (기본 adapter는 no-op)
+7. `adapter.to_canonical` → `adapter.encrypt_canonical`
+8. `adapter.drop_stale` — stale는 quarantine
+9. `adapter.save_accepted` (silver + gold)
+10. `adapter.save_quarantine`
+11. `adapter.ready_payload` → Kafka ready 토픽 publish
 
 ---
 
@@ -96,12 +98,12 @@ Supply(8100) → mail.events → spark_ingest_mail.py → MailAdapter
 
 | Layer | 역할 (메일 PoC) |
 |-------|------------------|
-| **Silver** | 검증·암호화 통과 canonical (`local.silver.mail`) |
+| **Silver** | 검증·정제·암호화 통과 canonical (`local.silver.mail`) |
 | **Gold** | Serving·소비용 (`local.gold.mail`) — **현 PoC는 silver와 동일 row** |
 | **Quarantine** | JSON 파싱 실패, Supply fetch 실패, 검증 실패, stale (Kafka DLQ 아님) |
 
 - **DELETE** 이벤트: quarantine이 아니라 silver·gold에서 **물리 삭제**
-- 향후: Silver HTML 정제, Gold 서빙 전용 shape 분리 가능
+- 향후: Gold 서빙 전용 shape 분리 가능
 
 ---
 
