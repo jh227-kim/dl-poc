@@ -72,6 +72,64 @@ services:
       - "host.docker.internal:host-gateway"
     restart: always
 
+  # 1. Search Service (검색 Mock 서비스)
+  search-consumer-mock:
+    build:
+      context: ./consumer_mock_service
+    image: consumer-mock-service:latest
+    container_name: search-consumer-mock
+    ports:
+      - "8101:8000"
+    environment:
+      - SERVICE_LABEL=검색서비스
+      - KAFKA_CONSUMER_GROUP=search-to-be
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - KAFKA_READY_TOPIC=mail.ready
+      - SERVING_SERVICE_URL=http://api-gateway:8106
+      - MY_API_KEY=search-secret-key-456
+    depends_on:
+      - kafka
+      - api-gateway
+    restart: always
+
+  # 2. Mobile Service (모바일 Mock 서비스)
+  mobile-consumer-mock:
+    image: consumer-mock-service:latest
+    container_name: mobile-consumer-mock
+    ports:
+      - "8102:8000"
+    environment:
+      - SERVICE_LABEL=모바일서비스
+      - KAFKA_CONSUMER_GROUP=mobile-to-be
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - KAFKA_READY_TOPIC=mail.ready
+      - SERVING_SERVICE_URL=http://api-gateway:8106
+      - MY_API_KEY=mobile-secret-key-123
+    depends_on:
+      - kafka
+      - api-gateway
+      - search-consumer-mock
+    restart: always
+
+  # 3. Graph Service (Graph Mock 서비스)
+  graph-consumer-mock:
+    image: consumer-mock-service:latest
+    container_name: graph-consumer-mock
+    ports:
+      - "8103:8000"
+    environment:
+      - SERVICE_LABEL=Graph서비스
+      - KAFKA_CONSUMER_GROUP=graph-to-be
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - KAFKA_READY_TOPIC=mail.ready
+      - SERVING_SERVICE_URL=http://api-gateway:8106
+      - MY_API_KEY=graph-secret-key-789
+    depends_on:
+      - kafka
+      - api-gateway
+      - search-consumer-mock
+    restart: always
+
 volumes:
   minio_data:
   zookeeper_data:

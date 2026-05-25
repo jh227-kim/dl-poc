@@ -12,14 +12,17 @@ adapter / 공통 ingest 파이프라인 / 새 도메인 추가 방법은 **[data
 
 | 경로 | 설명 |
 |------|------|
-| `docker-compose.yml` | MinIO(9000), Postgres(5432), Kafka(9092), Zookeeper |
+| `docker-compose.yml` | MinIO, Postgres, Kafka/ZK, Kafka-UI, Kong API Gateway 및 소비시스템 mock 3종 일괄 정의 |
+| `kong.yml` | Kong API Gateway용 선언적 라우팅 및 역할 기반 ACL(접근 제어) 설정 |
 | `spark_ingest_mail.py` | Structured Streaming ingest (메일 진입점) |
 | `datalake/` | adapter, ingest_core, layers — [README](datalake/README.md) |
-| `serving_service/` | 자바(Spark) 없이 Python 네이티브(PyIceberg)로 MinIO Parquet 데이터를 직접 조회하는 서빙 레이어 |
+| `serving_service/` | 자바(Spark) 없이 Python 네이티브(PyIceberg)로 MinIO Parquet 데이터를 직접 조회하는 서빙 레이어 (Port 8105) |
+| `consumer_mock_service/` | Docker Compose 내부에서 다중 인스턴스로 기동되는 소비시스템(모바일, 검색, Graph) 통합 mock |
+| `supply_service/` | FastAPI 메일 공급/생성 마이크로서비스 (Port 8100) |
+| `dashboard/` | 수집 현황 및 소비시스템 로그 모니터링 웹 대시보드 (Port 8104) |
 | `app.py` | Iceberg/MinIO 연결만 빠르게 검증할 때 (선택) |
 | `examples/mail_event_publish.py` | Kafka에 이벤트 한 건 발행 (선택) |
 | `scripts/kafka-smoke.bat` | Windows: 토픽 생성 + produce/consume 스모크 |
-| `supply_service/` 등 | FastAPI 마이크로서비스 (기본 포트 8100~) |
 
 ## 한 번만: 루트에서 venv + 패키지
 
@@ -31,12 +34,26 @@ py -3 -m venv venv
 venv\Scripts\pip install -r requirements.txt
 ```
 
-## 인프라 (이 폴더에서 Compose)
+## 인프라 및 게이트웨이/Mock 실행 (이 폴더에서 Compose)
+
+현재는 Docker Compose 기동 시 **스토리지만 아니라 Kong API Gateway 및 소비시스템 Mock 3종이 모두 포함**되어 함께 기동됩니다.
 
 ```bat
 cd /d path\to\dl-poc\to-be
 docker compose up -d
 ```
+
+> [!TIP]
+> **Docker Compose에 탑재되어 자동으로 뜨는 서비스들:**
+> - 데이터 레이크 인프라: MinIO (`9000`/`9001`), PostgreSQL (`5432`), Kafka (`9092`), ZooKeeper
+> - 편의 도구: Kafka-UI (`8632`)
+> - 보안 & 라우팅: **Kong API Gateway** (`8106`)
+> - 소비시스템 Mock 3종: 
+>   - 검색 Mock 서비스 (`8101` -> 컨테이너 `8000`)
+>   - 모바일 Mock 서비스 (`8102` -> 컨테이너 `8000`)
+>   - Graph Mock 서비스 (`8103` -> 컨테이너 `8000`)
+> 
+
 
 ## Kafka 토픽 (선택)
 
@@ -55,16 +72,26 @@ to-be\scripts\kafka-smoke.bat
 
 
 
-## end-to-end 최소 (터미널 2개 + 선택 consumer)
+## end-to-end 최소 흐름 테스트 (터미널 3개 필요)
 
-### 1) 공급 서비스 (8100)
+소비시스템 Mock들이 Kafka의 `mail.ready` 알림을 받으면 즉시 **게이트웨이(Kong)를 거쳐 데이터 서빙 레이어(`serving_service`)에 실제 데이터를 요청**합니다. 따라서 전체 E2E 흐름을 검증하기 위해서는 로컬에서 **`supply_service`**와 **`serving_service`**를 모두 띄워두어야 합니다.
+
+### 1) 공급 서비스 기동 (Port 8100)
 
 ```bat
 cd /d path\to\dl-poc\to-be\supply_service
 ..\..\venv\Scripts\uvicorn main:app --host 0.0.0.0 --port 8100
 ```
 
-### 2) Spark ingest
+### 2) 데이터 서빙 서비스 기동 (Port 8105)
+*이 서비스가 켜져 있어야 Mock 서비스들이 게이트웨이를 통해 메일 상세 내용을 조회할 수 있습니다.*
+
+```bat
+cd /d path\to\dl-poc\to-be\serving_service
+..\..\venv\Scripts\uvicorn main:app --host 0.0.0.0 --port 8105
+```
+
+### 3) Spark Ingest 실행 (메일 수집 엔진)
 
 **저장소 루트**에서:
 
@@ -76,9 +103,8 @@ venv\Scripts\python to-be\spark_ingest_mail.py
 - 첫 실행 시 JAR 다운로드로 시간이 걸릴 수 있습니다.
 - **Windows**: 기본 체크포인트는 MinIO `s3a://warehouse/.spark-checkpoints/mail-ingest` (로그에 `>>> checkpoint:`).
 - **Linux/macOS**: 기본은 이 폴더 아래 `.spark-mail-ingest-cp/`.
-- 바꾸기: `MAIL_INGEST_CHECKPOINT` 또는 `SPARK_CHECKPOINT_LOCATION`.
 
-### 3) 메일 생성
+### 4) 메일 생성 (E2E 테스트 트리거)
 
 ```bat
 curl -X POST http://localhost:8100/mails -H "Content-Type: application/json" -d "{\"title\":\"t\",\"body\":\"b\",\"sender\":\"s@test.com\"}"
@@ -130,16 +156,24 @@ venv\Scripts\python to-be\app.py
 - `HADOOP_HOME` 기본 `C:\hadoop` — Spark 스크립트가 참고합니다.
 - Spark 실행은 **`venv\Scripts\python to-be\spark_ingest_mail.py`** 로 통일하면 `PYSPARK_PYTHON`이 맞습니다.
 
-## 전체 To-Be 서비스 (대시보드 포함)
+## 전체 To-Be 서비스 수동 기동 요약 (대시보드 포함)
+
+앞서 설명드렸듯이 **`search_service`, `mobile_service`, `graph_service` 3종은 `docker compose up -d`를 통해 백그라운드 컨테이너로 항상 작동**하므로, 로컬 터미널에서 수동으로 띄울 필요가 없습니다. 
+
+모니터링 대시보드와 함께 전체 구성을 기동하려면 아래 3개의 서비스만 개별 터미널에서 기동해주십시오:
 
 ```bat
-cd to-be\supply_service  && ..\..\venv\Scripts\uvicorn main:app --host 0.0.0.0 --port 8100
-cd to-be\search_service  && ..\..\venv\Scripts\uvicorn main:app --host 0.0.0.0 --port 8101
-cd to-be\mobile_service  && ..\..\venv\Scripts\uvicorn main:app --host 0.0.0.0 --port 8102
-cd to-be\graph_service   && ..\..\venv\Scripts\uvicorn main:app --host 0.0.0.0 --port 8103
-cd to-be\dashboard       && ..\..\venv\Scripts\uvicorn main:app --host 0.0.0.0 --port 8104
+# 1) 공급 서비스 (Port 8100)
+cd to-be\supply_service && ..\..\venv\Scripts\uvicorn main:app --host 0.0.0.0 --port 8100
+
+# 2) 데이터 서빙 레이어 (Port 8105)
 cd to-be\serving_service && ..\..\venv\Scripts\uvicorn main:app --host 0.0.0.0 --port 8105
+
+# 3) 모니터링 대시보드 (Port 8104)
+cd to-be\dashboard && ..\..\venv\Scripts\uvicorn main:app --host 0.0.0.0 --port 8104
 ```
+
+기동 후 [대시보드(http://localhost:8104)](http://localhost:8104)에 접속하면, Docker Compose 내부에서 수신되는 소비시스템들의 실시간 로그 수신 상태를 직관적으로 모니터링할 수 있습니다.
 
 ## 문제가 자주 나는 곳
 
