@@ -14,7 +14,7 @@ KAFKA_BOOTSTRAP = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
 KAFKA_READY_TOPIC = os.environ.get("KAFKA_READY_TOPIC", "mail.ready")
 SERVING_SERVICE_URL = os.environ.get("SERVING_SERVICE_URL", "http://localhost:8106")
 API_KEY = os.environ.get("MY_API_KEY", "mock-secret-key")
-AUTO_OFFSET = os.environ.get("KAFKA_AUTO_OFFSET_RESET", "latest")
+AUTO_OFFSET = os.environ.get("KAFKA_AUTO_OFFSET_RESET", "earliest")
 
 app = FastAPI(title=f"{SERVICE_LABEL} (To-Be)")
 received_data: list = []
@@ -46,24 +46,39 @@ def handle_event(mail_id: str | None, action: str | None) -> None:
         logs.append(f"[{SERVICE_LABEL}] 오류: {e}")
 
 
+import time
+
+
 def kafka_loop() -> None:
+    retry_interval = 2
+    consumer = None
+    
+    while True:
+        try:
+            print(f"[{SERVICE_LABEL}] Kafka 연결 시도 중... (bootstrap={KAFKA_BOOTSTRAP})")
+            consumer = KafkaConsumer(
+                KAFKA_READY_TOPIC,
+                bootstrap_servers=KAFKA_BOOTSTRAP,
+                group_id=CONSUMER_GROUP,
+                value_deserializer=lambda b: json.loads(b.decode("utf-8")),
+                auto_offset_reset=AUTO_OFFSET,
+                enable_auto_commit=True,
+            )
+            print(f"[{SERVICE_LABEL}] Kafka 연결 성공 및 구독 중: topic={KAFKA_READY_TOPIC} group={CONSUMER_GROUP}")
+            break
+        except Exception as e:
+            print(f"[{SERVICE_LABEL}] Kafka 연결 실패 ({e}). {retry_interval}초 후 재시도...")
+            time.sleep(retry_interval)
+            retry_interval = min(retry_interval * 2, 60)
+
     try:
-        consumer = KafkaConsumer(
-            KAFKA_READY_TOPIC,
-            bootstrap_servers=KAFKA_BOOTSTRAP,
-            group_id=CONSUMER_GROUP,
-            value_deserializer=lambda b: json.loads(b.decode("utf-8")),
-            auto_offset_reset=AUTO_OFFSET,
-            enable_auto_commit=True,
-        )
-        print(f"[{SERVICE_LABEL}] 구독 중: topic={KAFKA_READY_TOPIC} group={CONSUMER_GROUP}")
         for message in consumer:
             body = message.value
             if not isinstance(body, dict):
                 continue
             handle_event(body.get("mail_id"), body.get("status"))
     except Exception as e:
-        print(f"[{SERVICE_LABEL}] Kafka 루프 오류 발생: {e}")
+        print(f"[{SERVICE_LABEL}] Kafka 루프 중 오류 발생: {e}")
 
 
 @app.on_event("startup")

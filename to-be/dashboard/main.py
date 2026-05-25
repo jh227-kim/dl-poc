@@ -64,6 +64,7 @@ async def create_mail():
                 "title": "테스트 메일",
                 "body": "To-Be: Kafka ingest 흐름 시연입니다.",
                 "sender": "test@company.com",
+                "receiver": "receiver@company.com",
             },
         )
         return r.json()

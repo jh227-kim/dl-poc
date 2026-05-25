@@ -19,11 +19,21 @@ producer: KafkaProducer | None = None
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     global producer
-    producer = KafkaProducer(
-        bootstrap_servers=KAFKA_BOOTSTRAP,
-        value_serializer=lambda v: json.dumps(v, ensure_ascii=False).encode("utf-8"),
-        linger_ms=20,
-    )
+    retry_interval = 2
+    while True:
+        try:
+            print(f"[공급서비스 To-Be] Kafka 연결 시도 중... (bootstrap={KAFKA_BOOTSTRAP})")
+            producer = KafkaProducer(
+                bootstrap_servers=KAFKA_BOOTSTRAP,
+                value_serializer=lambda v: json.dumps(v, ensure_ascii=False).encode("utf-8"),
+                linger_ms=20,
+            )
+            print("[공급서비스 To-Be] Kafka 연결 성공!")
+            break
+        except Exception as e:
+            print(f"[공급서비스 To-Be] Kafka 연결 실패 ({e}). {retry_interval}초 후 재시도...")
+            await asyncio.sleep(retry_interval)
+            retry_interval = min(retry_interval * 2, 60)
     yield
     if producer is not None:
         producer.flush()

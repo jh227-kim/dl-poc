@@ -130,6 +130,61 @@ services:
       - search-consumer-mock
     restart: always
 
+  # 4. Supply Mock Service (공급 Mock 서비스)
+  supply-mock-service:
+    build:
+      context: ./supply_mock_service
+    image: supply-mock-service:latest
+    container_name: supply-mock-service
+    ports:
+      - "8100:8000"
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - KAFKA_INGEST_TOPIC=mail.events
+    depends_on:
+      - kafka
+    restart: always
+
+  # 5. Data Serving Service (데이터 서빙 서비스)
+  serving-service:
+    build:
+      context: ./
+      dockerfile: serving_service/Dockerfile
+    image: serving-service:latest
+    container_name: serving-service
+    ports:
+      - "8105:8000"
+    environment:
+      - ICEBERG_CATALOG_URI=postgresql://admin:password@postgres:5432/iceberg_catalog
+      - MINIO_ENDPOINT=http://minio:9000
+      - SERVING_PRIVILEGED_KEY=super-secret-privileged-key
+    depends_on:
+      - postgres
+      - minio
+    restart: always
+
+  # 6. Monitoring Dashboard (대시보드 서비스)
+  dashboard:
+    build:
+      context: ./dashboard
+    image: poc-dashboard:latest
+    container_name: dashboard
+    ports:
+      - "8104:8000"
+    environment:
+      - SUPPLY_SERVICE_URL=http://supply-mock-service:8000
+      - SEARCH_SERVICE_URL=http://search-consumer-mock:8000
+      - MOBILE_SERVICE_URL=http://mobile-consumer-mock:8000
+      - GRAPH_SERVICE_URL=http://graph-consumer-mock:8000
+    depends_on:
+      - supply-mock-service
+      - search-consumer-mock
+      - mobile-consumer-mock
+      - graph-consumer-mock
+    restart: always
+
+
+
 volumes:
   minio_data:
   zookeeper_data:
