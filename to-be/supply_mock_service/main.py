@@ -69,7 +69,7 @@ class MailCreate(BaseModel):
     body: str
     sender: str
     sender_name: str = ""
-    receiver: str = ""
+    receiver: str
     receiver_name: str = ""
     cc: str = ""
     sent_at: str | None = None

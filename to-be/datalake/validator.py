@@ -35,7 +35,9 @@ def validate_mail(data: dict) -> tuple[bool, str | None]:
         return False, f"invalid sender email: {sender}"
 
     receiver = data.get("receiver")
-    if receiver not in (None, "") and not EMAIL_PATTERN.match(str(receiver).strip()):
+    if receiver is None or str(receiver).strip() == "":
+        return False, "receiver is required"
+    if not EMAIL_PATTERN.match(str(receiver).strip()):
         return False, f"invalid receiver email: {receiver}"
 
     cc = data.get("cc")
