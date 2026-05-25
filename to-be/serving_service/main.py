@@ -126,3 +126,11 @@ def get_lake_mail(mail_id: str, x_consumer_privileged_key: str | None = Header(d
     except Exception as exc:
         print(f">>> [Serving Error] Gold 레이어 데이터 조회 및 처리(복호화) 중 예기치 않은 에러 발생: {exc}")
         raise HTTPException(status_code=500, detail=f"Failed to process gold layer data: {exc}")
+
+
+@app.get("/mails/debug/headers")
+def debug_headers(x_consumer_privileged_key: str | None = Header(default=None)):
+    return {
+        "x_consumer_privileged_key": x_consumer_privileged_key,
+        "is_privileged": _is_privileged(x_consumer_privileged_key)
+    }
