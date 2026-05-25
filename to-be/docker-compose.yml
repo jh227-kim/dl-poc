@@ -183,7 +183,27 @@ services:
       - graph-consumer-mock
     restart: always
 
-
+  # 7. Spark Ingest Service (이메일 적재용 Spark 스트리밍 엔진)
+  spark-mail-ingest:
+    build:
+      context: ./
+      dockerfile: Dockerfile.spark
+    container_name: spark-mail-ingest
+    depends_on:
+      - kafka
+      - minio
+      - postgres
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - ICEBERG_CATALOG_JDBC_URI=jdbc:postgresql://postgres:5432/iceberg_catalog
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ACCESS_KEY=admin
+      - MINIO_SECRET_KEY=password
+      - SPARK_CHECKPOINT_LOCATION=s3a://warehouse/.spark-checkpoints/mail-ingest
+      - SPARK_DRIVER_HOST=127.0.0.1
+      - SPARK_DRIVER_BIND_ADDRESS=0.0.0.0
+      - SUPPLY_SERVICE_URL=http://supply-mock-service:8000
+    restart: always
 
 volumes:
   minio_data:

@@ -162,34 +162,46 @@ cd /d path\to\dl-poc
 venv\Scripts\python to-be\app.py
 ```
 
-## 환경 변수 (선택)
+## 환경 변수 및 설정 가이드
 
-| 변수 | 기본 | 설명 |
-|------|------|------|
-| `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | Kafka (호스트) |
-| `KAFKA_INGEST_TOPIC` | `mail.events` | 수집 토픽 |
-| `KAFKA_READY_TOPIC` | `mail.ready` | 적재 후 알림 |
-| `SUPPLY_SERVICE_URL` | `http://127.0.0.1:8100` | Spark → Supply |
-| `SPARK_STREAM_TRIGGER_SEC` | `5` | 트리거(초) |
-| `MAIL_INGEST_CHECKPOINT` | (플랫폼별) | Spark 체크포인트 URI |
-|`ICEBERG_CATALOG_URI`|`postgresql://admin:password@localhost:5432/iceberg_catalog`|카탈로그 메타데이터 상태 관리 DB 주소|
-|`MINIO_ENDPOINT`|`http://127.0.0.1:9000`|물리 데이터 저장 레이어 (Parquet IO 대상)|
-|`SPARK_STREAM_MAX_OFFSETS_PER_TRIGGER` | `5000` | 마이크로 배치(Trigger)가 Kafka에서 읽어올 최대 메시지 개수 |
-|`DL_LIMITER_INITIAL_RPS` | `50` | SUPPLY_SERVICE 초당 호출 제한 시작값 |
-|`DL_LIMITER_MIN_RPS` | `5` |  SUPPLY_SERVICE 초당 호출 최소 |
-|`DL_LIMITER_MAX_RPS` | `200` | SUPPLY_SERVICE 초당 호출 제한 최대  |
+Docker Compose 가상 네트워크와 로컬 실행 환경(`venv`) 간의 주소 매핑 충돌을 방지하기 위해 사용되는 주요 환경 변수를 체계적으로 대조 정리했습니다.
 
+| 적용 서비스 | 환경 변수명 | 로컬 가상환경 (`venv`) 기본값 | Docker Compose 기본값 | 역할 및 설명 |
+| :--- | :--- | :--- | :--- | :--- |
+| **`spark-mail-ingest`**<br>(Spark 스트리밍 수집엔진) | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | `kafka:29092` | Kafka 브로커 연동 부트스트랩 서버 주소 |
+| | `SUPPLY_SERVICE_URL` | `http://127.0.0.1:8100` | `http://supply-mock-service:8000` | 메일 상세 데이터 Fetch용 HTTP API 주소 |
+| | `ICEBERG_CATALOG_JDBC_URI` | `jdbc:postgresql://localhost:5432/iceberg_catalog` | `jdbc:postgresql://postgres:5432/iceberg_catalog` | Iceberg 테이블 스키마 관리 JDBC PostgreSQL URI |
+| | `MINIO_ENDPOINT` | `http://127.0.0.1:9000` | `http://minio:9000` | Parquet 데이터 블록 적재 대상인 MinIO S3 주소 |
+| | `SPARK_CHECKPOINT_LOCATION` / `MAIL_INGEST_CHECKPOINT` | `.spark-mail-ingest-cp` (로컬 디렉토리) | `s3a://warehouse/.spark-checkpoints/mail-ingest` | Exactly-Once 상태 복구를 위한 스트리밍 체크포인트 경로 |
+| | `SPARK_DRIVER_HOST` | `127.0.0.1` | `127.0.0.1` | PySpark 드라이버 프로세스의 호스트 식별용 주소 |
+| | `SPARK_DRIVER_BIND_ADDRESS` | `127.0.0.1` | `0.0.0.0` | 드라이버 JVM 네이티브 바인드 대기 소켓 주소 |
+| **`serving-service`**<br>(PyIceberg 데이터서빙 API) | `ICEBERG_CATALOG_URI` | `postgresql://admin:password@localhost:5432/iceberg_catalog` | `postgresql://admin:password@postgres:5432/iceberg_catalog` | PyIceberg가 직접 조회하는 카탈로그 Postgres JDBC URI |
+| | `MINIO_ENDPOINT` | `http://127.0.0.1:9000` | `http://minio:9000` | 물리 Parquet 데이터 고속 적재/조회용 MinIO S3 주소 |
+| **`supply-mock-service`**<br>(공급 모의 서비스) | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | `kafka:29092` | 모의 메일 수신 시 이벤트를 송출하기 위한 Kafka 주소 |
+| | `KAFKA_INGEST_TOPIC` | `mail.events` | `mail.events` | Inbound 메일 생성 이벤트 발행 토픽명 |
+| **`consumer-mock-services`**<br>(소비 Mock 3종 - 모바일/검색/Graph) | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | `kafka:29092` | `mail.ready` 토픽을 실시간 감시하기 위한 Kafka 주소 |
+| | `KAFKA_READY_TOPIC` | `mail.ready` | `mail.ready` | 적재 완료 알림을 모니터링하기 위한 구독 토픽명 |
+| | `SERVING_SERVICE_URL` | `http://localhost:8106` | `http://api-gateway:8106` | 수집 알림 감지 시 실제 데이터를 요청할 API 게이트웨이 주소 |
+| **`dashboard`**<br>(웹 통계 모니터링 화면) | `SUPPLY_SERVICE_URL` | `http://localhost:8100` | `http://supply-mock-service:8000` | 공급 통계를 화면에 실시간 노출하기 위한 API 연동 주소 |
+| | `SEARCH_SERVICE_URL` | `http://localhost:8101` | `http://search-consumer-mock:8000` | 대시보드 화면에서 각 소비 Mock 인스턴스들의 |
+| | `MOBILE_SERVICE_URL` | `http://localhost:8102` | `http://mobile-consumer-mock:8000` | 실시간 로그 수신 상태와 통계를 가로채 |
+| | `GRAPH_SERVICE_URL` | `http://localhost:8103` | `http://graph-consumer-mock:8000` | 모니터링하기 위한 개별 mock 서비스 조회 API 주소 |
 
-## Windows 참고
+---
 
-- `HADOOP_HOME` 기본 `C:\hadoop` — Spark 스크립트가 참고합니다.
-- Spark 실행은 **`venv\Scripts\python to-be\spark_ingest_mail.py`** 로 통일하면 `PYSPARK_PYTHON`이 맞습니다.
+## Windows 환경 실행 참고
+
+- **Hadoop 바이너리 매핑**: `HADOOP_HOME` 기본 `C:\hadoop` — Spark 스크립트가 로컬 Native IO 처리를 위해 참고합니다.
+- **Python 인터프리터 경로 일치**: Spark 실행은 반드시 **`venv\Scripts\python to-be\spark_ingest_mail.py`** 로 통일하여 구동해야 Python Worker 버전 충돌을 피할 수 있습니다.
+
+---
 
 ## 전체 To-Be 서비스 기동 요약 (대시보드 포함)
 
-**`serving-service`, `supply-mock-service`, `search-consumer-mock`, `mobile-consumer-mock`, `graph-consumer-mock` 및 `dashboard`는 `docker compose up -d`를 통해 백그라운드 컨테이너로 항상 작동**하므로, 로컬 터미널에서 수동으로 임의의 서비스를 직접 띄울 필요가 전혀 없습니다.
+`serving-service`, `supply-mock-service`, `search-consumer-mock`, `mobile-consumer-mock`, `graph-consumer-mock`, `dashboard`에 더불어 수집 엔진인 **`spark-mail-ingest`까지 전체 통합 환경이 `docker compose up -d` 명령어 하나로 완벽하게 자동 제어**됩니다. 
 
-기동 후 [대시보드(http://localhost:8104)](http://localhost:8104)에 접속하면, Docker Compose 내부에서 수신되는 소비시스템들의 실시간 로그 수신 상태 및 공급 통계를 직관적으로 모니터링할 수 있습니다.
+기동 후 [대시보드(http://localhost:8104)](http://localhost:8104)에 접속하면, 전체 스트리밍 파이프라인의 실시간 적재 현황 및 각 Mock 서비스들의 상태 통계를 직관적으로 실시간 모니터링할 수 있습니다.
+
 
 
 ## 문제가 자주 나는 곳
