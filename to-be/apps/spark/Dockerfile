@@ -38,7 +38,7 @@ RUN sed -i 's/pandas>=3.0.3/pandas>=2.0.0,<2.1.0/g' requirements.txt && \
 COPY . /app
 
 # 파이썬 패키지 경로 및 드라이버 환경설정
-ENV PYTHONPATH="/app"
+ENV PYTHONPATH="/app:/app/libs"
 ENV PYSPARK_PYTHON=python3
 ENV PYSPARK_DRIVER_PYTHON=python3
 
