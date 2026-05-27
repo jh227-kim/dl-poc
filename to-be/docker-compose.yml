@@ -75,7 +75,7 @@ services:
   # 1. Search Service (검색 Mock 서비스)
   search-consumer-mock:
     build:
-      context: ./consumer_mock_service
+      context: ./mocks/consumer_mock_service
     image: consumer-mock-service:latest
     container_name: search-consumer-mock
     ports:
@@ -133,7 +133,7 @@ services:
   # 4. Supply Mock Service (공급 Mock 서비스)
   supply-mock-service:
     build:
-      context: ./supply_mock_service
+      context: ./mocks/supply_mock_service
     image: supply-mock-service:latest
     container_name: supply-mock-service
     ports:
@@ -149,7 +149,7 @@ services:
   serving-service:
     build:
       context: ./
-      dockerfile: serving_service/Dockerfile
+      dockerfile: apps/serving_service/Dockerfile
     image: serving-service:latest
     container_name: serving-service
     ports:
@@ -166,7 +166,7 @@ services:
   # 6. Monitoring Dashboard (대시보드 서비스)
   dashboard:
     build:
-      context: ./dashboard
+      context: ./mocks/dashboard
     image: poc-dashboard:latest
     container_name: dashboard
     ports:
@@ -187,7 +187,7 @@ services:
   spark-mail-ingest:
     build:
       context: ./
-      dockerfile: Dockerfile.spark
+      dockerfile: apps/spark/Dockerfile
     container_name: spark-mail-ingest
     depends_on:
       - kafka
@@ -209,9 +209,9 @@ services:
   spark-dlq-processor:
     build:
       context: ./
-      dockerfile: Dockerfile.spark
+      dockerfile: apps/spark/Dockerfile
     container_name: spark-dlq-processor
-    command: ["python3", "spark_dlq_processor.py"]
+    command: ["python3", "apps/spark/spark_dlq_processor.py"]
     depends_on:
       - kafka
     environment:

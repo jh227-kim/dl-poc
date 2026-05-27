@@ -1,0 +1,121 @@
+# Default values for dl-poc.
+# This is a YAML-formatted file.
+
+nameOverride: ""
+fullnameOverride: ""
+
+# ----------------------------------------------------
+# Infrastructure Components (ns-dl-infra)
+# ----------------------------------------------------
+postgres:
+  enabled: true
+  namespace: "ns-dl-infra"
+  image: postgres:15
+  persistence:
+    size: 8Gi
+    storageClassName: ""
+
+minio:
+  enabled: true
+  namespace: "ns-dl-infra"
+  image: minio/minio
+  rootUser: admin
+  rootPassword: password
+  persistence:
+    size: 10Gi
+    storageClassName: ""
+
+zookeeper:
+  enabled: true
+  namespace: "ns-dl-infra"
+  image: confluentinc/cp-zookeeper:7.5.3
+  persistence:
+    size: 5Gi
+    storageClassName: ""
+
+kafka:
+  enabled: true
+  namespace: "ns-dl-infra"
+  image: confluentinc/cp-kafka:7.5.3
+  persistence:
+    size: 10Gi
+    storageClassName: ""
+
+kafkaUi:
+  enabled: true
+  namespace: "ns-dl-infra"
+  image: provectuslabs/kafka-ui:latest
+
+# ----------------------------------------------------
+# External GCP Services Configuration
+# Active ONLY when respective component.enabled is 'false'.
+# ----------------------------------------------------
+externalPostgres:
+  host: "cloud-sql-postgres-ip"
+  port: 5432
+  user: "admin"
+  password: "password"
+  database: "iceberg_catalog"
+
+externalMinio:
+  # GCP Cloud Storage (GCS) S3-compatible XML API endpoint
+  endpoint: "https://storage.googleapis.com"
+  accessKey: "gcp-gcs-hmac-access-key"
+  secretKey: "gcp-gcs-hmac-secret-key"
+
+externalKafka:
+  # GCP Managed Service for Apache Kafka / Confluent Cloud Bootstrap server
+  bootstrapServers: "gcp-managed-kafka-bootstrap-servers:9092"
+
+# ----------------------------------------------------
+# Core Streaming Pipeline (ns-dl-pipeline)
+# ----------------------------------------------------
+sparkMailIngest:
+  namespace: "ns-dl-pipeline" 
+  image: spark-mail-ingest:latest
+  sparkCheckpointLocation: "s3a://warehouse/.spark-checkpoints/mail-ingest"
+
+sparkDlqProcessor:
+  namespace: "ns-dl-pipeline" 
+  image: spark-dlq-processor:latest
+
+# ----------------------------------------------------
+# Core Serving Applications (ns-dl-serving)
+# ----------------------------------------------------
+servingService:
+  namespace: "ns-dl-serving" 
+  image: serving-service:latest
+
+apiGateway:
+  namespace: "ns-dl-serving" 
+  image: kong:latest
+
+# ----------------------------------------------------
+# Simulator & Testing Tools (ns-dl-mocks)
+# ----------------------------------------------------
+mocks:
+  enabled: true
+  namespace: "ns-dl-mocks" 
+  image:
+    consumerMock: consumer-mock-service:latest
+    supplyMock: supply-mock-service:latest
+
+dashboard:
+  enabled: true
+  namespace: "ns-dl-mocks" 
+  image: poc-dashboard:latest
+
+# ----------------------------------------------------
+# Ingress Controller Config (Domain-based routing)
+# ----------------------------------------------------
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+  hosts:
+    minio: "minio.dl-poc.local"
+    kafkaUi: "kafka-ui.dl-poc.local"
+    apiGateway: "api.dl-poc.local"
+    dashboard: "dashboard.dl-poc.local"
+  tls: []

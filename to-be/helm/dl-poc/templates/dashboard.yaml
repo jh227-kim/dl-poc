@@ -1,0 +1,53 @@
+{{- if .Values.dashboard.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "dl-poc.fullname" . }}-dashboard
+  namespace: {{ include "dl-poc.dashboardNamespace" . }}
+  labels:
+    {{- include "dl-poc.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "dl-poc.selectorLabels" . | nindent 6 }}
+      app: dashboard
+  template:
+    metadata:
+      labels:
+        {{- include "dl-poc.selectorLabels" . | nindent 8 }}
+        app: dashboard
+    spec:
+      containers:
+        - name: dashboard
+          image: {{ .Values.dashboard.image }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            - name: SUPPLY_SERVICE_URL
+              value: "http://{{ include "dl-poc.fullname" . }}-supply-mock-service.{{ include "dl-poc.mocksNamespace" . }}.svc.cluster.local:8000"
+            - name: SEARCH_SERVICE_URL
+              value: "http://{{ include "dl-poc.fullname" . }}-search-consumer-mock.{{ include "dl-poc.mocksNamespace" . }}.svc.cluster.local:8000"
+            - name: MOBILE_SERVICE_URL
+              value: "http://{{ include "dl-poc.fullname" . }}-mobile-consumer-mock.{{ include "dl-poc.mocksNamespace" . }}.svc.cluster.local:8000"
+            - name: GRAPH_SERVICE_URL
+              value: "http://{{ include "dl-poc.fullname" . }}-graph-consumer-mock.{{ include "dl-poc.mocksNamespace" . }}.svc.cluster.local:8000"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "dl-poc.fullname" . }}-dashboard
+  namespace: {{ include "dl-poc.dashboardNamespace" . }}
+  labels:
+    {{- include "dl-poc.labels" . | nindent 4 }}
+spec:
+  ports:
+    - port: 8000
+      targetPort: 8000
+      name: http
+  selector:
+    {{- include "dl-poc.selectorLabels" . | nindent 4 }}
+    app: dashboard
+{{- end -}}

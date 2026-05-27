@@ -1,0 +1,79 @@
+{{- if .Values.minio.enabled -}}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "dl-poc.fullname" . }}-minio-pvc
+  namespace: {{ include "dl-poc.minioNamespace" . }}
+  labels:
+    {{- include "dl-poc.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.minio.persistence.size }}
+  {{- if .Values.minio.persistence.storageClassName }}
+  storageClassName: {{ .Values.minio.persistence.storageClassName }}
+  {{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "dl-poc.fullname" . }}-minio
+  namespace: {{ include "dl-poc.minioNamespace" . }}
+  labels:
+    {{- include "dl-poc.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "dl-poc.selectorLabels" . | nindent 6 }}
+      app: minio
+  template:
+    metadata:
+      labels:
+        {{- include "dl-poc.selectorLabels" . | nindent 8 }}
+        app: minio
+    spec:
+      containers:
+        - name: minio
+          image: {{ .Values.minio.image }}
+          imagePullPolicy: IfNotPresent
+          args: ["server", "/data", "--console-address", ":9001"]
+          ports:
+            - containerPort: 9000
+              name: api
+            - containerPort: 9001
+              name: console
+          env:
+            - name: MINIO_ROOT_USER
+              value: {{ .Values.minio.rootUser | quote }}
+            - name: MINIO_ROOT_PASSWORD
+              value: {{ .Values.minio.rootPassword | quote }}
+          volumeMounts:
+            - name: minio-data
+              mountPath: /data
+      volumes:
+        - name: minio-data
+          persistentVolumeClaim:
+            claimName: {{ include "dl-poc.fullname" . }}-minio-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "dl-poc.fullname" . }}-minio
+  namespace: {{ include "dl-poc.minioNamespace" . }}
+  labels:
+    {{- include "dl-poc.labels" . | nindent 4 }}
+spec:
+  ports:
+    - port: 9000
+      targetPort: 9000
+      name: api
+    - port: 9001
+      targetPort: 9001
+      name: console
+  selector:
+    {{- include "dl-poc.selectorLabels" . | nindent 4 }}
+    app: minio
+{{- end -}}

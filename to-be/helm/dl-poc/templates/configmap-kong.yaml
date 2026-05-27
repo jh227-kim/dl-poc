@@ -1,0 +1,93 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "dl-poc.fullname" . }}-kong-config
+  namespace: {{ include "dl-poc.apiGatewayNamespace" . }}
+  labels:
+    {{- include "dl-poc.labels" . | nindent 4 }}
+data:
+  kong.yml: |
+    _format_version: "3.0"
+    _transform: true
+
+    # 1. Services & Routes with Role-Based ACL Authorization
+    services:
+      - name: serving-service
+        url: http://{{ include "dl-poc.fullname" . }}-serving-service.{{ include "dl-poc.appsNamespace" . }}.svc.cluster.local:8000
+        routes:
+          # [API 1] Mail Service API - Protected by Key-Auth and ACL
+          - name: mails-route
+            paths:
+              - /mails
+            strip_path: false
+            plugins:
+              - name: key-auth
+                config:
+                  key_names:
+                    - apikey
+              - name: acl
+                config:
+                  allow:
+                    - mails-group
+
+          # [API 2] User Service API (For future expansion)
+          - name: users-route
+            paths:
+              - /users
+            strip_path: false
+            plugins:
+              - name: key-auth
+                config:
+                  key_names:
+                    - apikey
+              - name: acl
+                config:
+                  allow:
+                    - users-group
+
+          # [API 3] Statistics Service API (For future expansion)
+          - name: statistics-route
+            paths:
+              - /statistics
+            strip_path: false
+            plugins:
+              - name: key-auth
+                config:
+                  key_names:
+                    - apikey
+              - name: acl
+                config:
+                  allow:
+                    - admin-group
+
+    # 2. Consumers, API Keys & Group Assignments (ACLs)
+    consumers:
+      - username: mobile_service_client
+        keyauth_credentials:
+          - key: mobile-secret-key-123
+        acls:
+          - group: mails-group
+          - group: users-group
+
+      - username: search_service_client
+        keyauth_credentials:
+          - key: search-secret-key-456
+        acls:
+          - group: mails-group
+          - group: users-group
+
+      - username: graph_service_client
+        keyauth_credentials:
+          - key: graph-secret-key-789
+        acls:
+          - group: mails-group
+          - group: admin-group
+
+    # 3. Privilege Authorization (x-consumer-privileged-key Injection)
+    plugins:
+      - name: request-transformer
+        consumer: mobile_service_client
+        config:
+          add:
+            headers:
+              - "x-consumer-privileged-key:super-secret-privileged-key"

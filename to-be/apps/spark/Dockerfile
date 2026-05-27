@@ -43,4 +43,4 @@ ENV PYSPARK_PYTHON=python3
 ENV PYSPARK_DRIVER_PYTHON=python3
 
 # 스트리밍 서비스 실행
-CMD ["python3", "spark_ingest_mail.py"]
+CMD ["python3", "apps/spark/spark_ingest_mail.py"]

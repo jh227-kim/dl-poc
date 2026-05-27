@@ -1,6 +1,6 @@
 # Data lake ingest (adapter)
 
-To-Be 데이터 레이크 **ingest** 코드는 `datalake/` 아래에 모여 있습니다.  
+To-Be 데이터 레이크 **ingest** 코드는 `libs/datalake/` 아래에 모여 있습니다.  
 **한 플랫폼** 안에 메일·결재·일정 등 **서비스(도메인)** 가 여러 개 있고, Kafka → Spark → Iceberg(silver/gold) → ready → Serving 흐름은 **공통**, **도메인별 차이는 adapter + layers** 로 plug-in 합니다.
 
 실행 절차(Docker, Supply, Spark 명령)는 [`../README.md`](../README.md)를 참고하세요.
@@ -21,7 +21,7 @@ To-Be 데이터 레이크 **ingest** 코드는 `datalake/` 아래에 모여 있�
 |------|------|
 | **공통 플랫폼** | `ingest_core`, `ingest_runner`, `spark_runtime`, `checkpoint` |
 | **메일 plug-in** | `adapters/mail.py`, `layers/mail.py` |
-| **메일 진입점** | `../spark_ingest_mail.py` (~45줄) |
+| **메일 진입점** | `../../apps/spark/spark_ingest_mail.py` (~45줄) |
 
 ### 목표
 
@@ -70,7 +70,7 @@ Supply(8100) → mail.events → spark_ingest_mail.py → MailAdapter
 | `encryption.py` | PII 필드 AES-256-GCM |
 | `validator.py` | 메일 검증 (향후 `validators/{domain}.py` 분리 가능) |
 | `refiners/mail.py` | 메일 HTML/MIME 본문 정제 |
-| `../spark_ingest_mail.py` | **메일 ingest 진입점** (`to-be/` 아래) |
+| `../../apps/spark/spark_ingest_mail.py` | **메일 ingest 진입점** |
 
 **import 호환:** `from datalake.layers import save_to_silver` — `layers/__init__.py`가 `layers/mail.py`를 re-export 합니다.
 
@@ -112,7 +112,7 @@ Supply(8100) → mail.events → spark_ingest_mail.py → MailAdapter
 저장소 **루트**(`dl-poc`)에서:
 
 ```bat
-venv\Scripts\python to-be\spark_ingest_mail.py
+venv\Scripts\python to-be\apps\spark\spark_ingest_mail.py
 ```
 
 - Supply **8100**, Docker(Kafka / MinIO / Postgres), MinIO **`warehouse`** 버킷
@@ -132,7 +132,7 @@ venv\Scripts\python to-be\spark_ingest_mail.py
 - [ ] `validators/{domain}.py` (또는 `validator_{domain}.py`)
 - [ ] `layers/{domain}.py` — `local.silver/gold/quarantine.{domain}`
 - [ ] `adapters/{domain}.py` — `SupplyAdapter` 구현
-- [ ] `../spark_ingest_{domain}.py` — adapter + checkpoint + `run_streaming_ingest`
+- [ ] `../../apps/spark/spark_ingest_{domain}.py` — adapter + checkpoint + `run_streaming_ingest`
 - [ ] Kafka `{domain}.events`, `{domain}.ready`
 - [ ] Serving `GET /.../{id}` → `local.gold.{domain}`
 - [ ] (선택) 소비 — `{domain}.ready` 구독 + Serving GET

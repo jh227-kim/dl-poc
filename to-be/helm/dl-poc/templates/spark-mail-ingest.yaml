@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "dl-poc.fullname" . }}-spark-mail-ingest
+  namespace: {{ include "dl-poc.sparkMailIngestNamespace" . }}
+  labels:
+    {{- include "dl-poc.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "dl-poc.selectorLabels" . | nindent 6 }}
+      app: spark-mail-ingest
+  template:
+    metadata:
+      labels:
+        {{- include "dl-poc.selectorLabels" . | nindent 8 }}
+        app: spark-mail-ingest
+    spec:
+      containers:
+        - name: spark-mail-ingest
+          image: {{ .Values.sparkMailIngest.image }}
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: {{ include "dl-poc.kafkaBootstrap" . | quote }}
+            - name: ICEBERG_CATALOG_JDBC_URI
+              value: {{ include "dl-poc.postgresJdbcUri" . | quote }}
+            - name: MINIO_ENDPOINT
+              value: {{ include "dl-poc.minioEndpoint" . | quote }}
+            - name: MINIO_ACCESS_KEY
+              value: {{ include "dl-poc.minioAccessKey" . | quote }}
+            - name: MINIO_SECRET_KEY
+              value: {{ include "dl-poc.minioSecretKey" . | quote }}
+            - name: SPARK_CHECKPOINT_LOCATION
+              value: {{ .Values.sparkMailIngest.sparkCheckpointLocation | quote }}
+            - name: SPARK_DRIVER_HOST
+              value: "127.0.0.1"
+            - name: SPARK_DRIVER_BIND_ADDRESS
+              value: "0.0.0.0"
+            - name: SUPPLY_SERVICE_URL
+              value: "http://{{ include "dl-poc.fullname" . }}-supply-mock-service.{{ include "dl-poc.mocksNamespace" . }}.svc.cluster.local:8000"

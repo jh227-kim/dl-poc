@@ -1,0 +1,169 @@
+{{- if .Values.mocks.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "dl-poc.fullname" . }}-search-consumer-mock
+  namespace: {{ include "dl-poc.mocksNamespace" . }}
+  labels:
+    {{- include "dl-poc.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "dl-poc.selectorLabels" . | nindent 6 }}
+      app: search-consumer-mock
+  template:
+    metadata:
+      labels:
+        {{- include "dl-poc.selectorLabels" . | nindent 8 }}
+        app: search-consumer-mock
+    spec:
+      containers:
+        - name: consumer-mock
+          image: {{ .Values.mocks.image.consumerMock }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            - name: SERVICE_LABEL
+              value: "검색서비스"
+            - name: KAFKA_CONSUMER_GROUP
+              value: "search-to-be"
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: {{ include "dl-poc.kafkaBootstrap" . | quote }}
+            - name: KAFKA_READY_TOPIC
+              value: "mail.ready"
+            - name: SERVING_SERVICE_URL
+              value: "http://{{ include "dl-poc.fullname" . }}-api-gateway.{{ include "dl-poc.apiGatewayNamespace" . }}.svc.cluster.local:8106"
+            - name: MY_API_KEY
+              value: "search-secret-key-456"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "dl-poc.fullname" . }}-search-consumer-mock
+  namespace: {{ include "dl-poc.mocksNamespace" . }}
+  labels:
+    {{- include "dl-poc.labels" . | nindent 4 }}
+spec:
+  ports:
+    - port: 8000
+      targetPort: 8000
+      name: http
+  selector:
+    {{- include "dl-poc.selectorLabels" . | nindent 4 }}
+    app: search-consumer-mock
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "dl-poc.fullname" . }}-mobile-consumer-mock
+  namespace: {{ include "dl-poc.mocksNamespace" . }}
+  labels:
+    {{- include "dl-poc.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "dl-poc.selectorLabels" . | nindent 6 }}
+      app: mobile-consumer-mock
+  template:
+    metadata:
+      labels:
+        {{- include "dl-poc.selectorLabels" . | nindent 8 }}
+        app: mobile-consumer-mock
+    spec:
+      containers:
+        - name: consumer-mock
+          image: {{ .Values.mocks.image.consumerMock }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            - name: SERVICE_LABEL
+              value: "모바일서비스"
+            - name: KAFKA_CONSUMER_GROUP
+              value: "mobile-to-be"
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: {{ include "dl-poc.kafkaBootstrap" . | quote }}
+            - name: KAFKA_READY_TOPIC
+              value: "mail.ready"
+            - name: SERVING_SERVICE_URL
+              value: "http://{{ include "dl-poc.fullname" . }}-api-gateway.{{ include "dl-poc.apiGatewayNamespace" . }}.svc.cluster.local:8106"
+            - name: MY_API_KEY
+              value: "mobile-secret-key-123"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "dl-poc.fullname" . }}-mobile-consumer-mock
+  namespace: {{ include "dl-poc.mocksNamespace" . }}
+  labels:
+    {{- include "dl-poc.labels" . | nindent 4 }}
+spec:
+  ports:
+    - port: 8000
+      targetPort: 8000
+      name: http
+  selector:
+    {{- include "dl-poc.selectorLabels" . | nindent 4 }}
+    app: mobile-consumer-mock
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "dl-poc.fullname" . }}-graph-consumer-mock
+  namespace: {{ include "dl-poc.mocksNamespace" . }}
+  labels:
+    {{- include "dl-poc.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "dl-poc.selectorLabels" . | nindent 6 }}
+      app: graph-consumer-mock
+  template:
+    metadata:
+      labels:
+        {{- include "dl-poc.selectorLabels" . | nindent 8 }}
+        app: graph-consumer-mock
+    spec:
+      containers:
+        - name: consumer-mock
+          image: {{ .Values.mocks.image.consumerMock }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            - name: SERVICE_LABEL
+              value: "Graph서비스"
+            - name: KAFKA_CONSUMER_GROUP
+              value: "graph-to-be"
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: {{ include "dl-poc.kafkaBootstrap" . | quote }}
+            - name: KAFKA_READY_TOPIC
+              value: "mail.ready"
+            - name: SERVING_SERVICE_URL
+              value: "http://{{ include "dl-poc.fullname" . }}-api-gateway.{{ include "dl-poc.apiGatewayNamespace" . }}.svc.cluster.local:8106"
+            - name: MY_API_KEY
+              value: "graph-secret-key-789"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "dl-poc.fullname" . }}-graph-consumer-mock
+  namespace: {{ include "dl-poc.mocksNamespace" . }}
+  labels:
+    {{- include "dl-poc.labels" . | nindent 4 }}
+spec:
+  ports:
+    - port: 8000
+      targetPort: 8000
+      name: http
+  selector:
+    {{- include "dl-poc.selectorLabels" . | nindent 4 }}
+    app: graph-consumer-mock
+{{- end -}}
