@@ -1,0 +1,49 @@
+{{- if .Values.kafkaUi.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "dl-poc.fullname" . }}-kafka-ui
+  namespace: {{ include "dl-poc.kafkaUiNamespace" . }}
+  labels:
+    {{- include "dl-poc.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "dl-poc.selectorLabels" . | nindent 6 }}
+      app: kafka-ui
+  template:
+    metadata:
+      labels:
+        {{- include "dl-poc.selectorLabels" . | nindent 8 }}
+        app: kafka-ui
+    spec:
+      containers:
+        - name: kafka-ui
+          image: {{ .Values.kafkaUi.image }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+              name: http
+          env:
+            - name: KAFKA_CLUSTERS_0_NAME
+              value: "local"
+            - name: KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS
+              value: {{ include "dl-poc.kafkaBootstrap" . | quote }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "dl-poc.fullname" . }}-kafka-ui
+  namespace: {{ include "dl-poc.kafkaUiNamespace" . }}
+  labels:
+    {{- include "dl-poc.labels" . | nindent 4 }}
+spec:
+  ports:
+    - port: 8080
+      targetPort: 8080
+      name: http
+  selector:
+    {{- include "dl-poc.selectorLabels" . | nindent 4 }}
+    app: kafka-ui
+{{- end -}}

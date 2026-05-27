@@ -1,0 +1,124 @@
+{{- if .Values.ingress.enabled -}}
+# ====================================================
+# 1. Infrastructure Layer Ingress (ns-dl-infra)
+# ====================================================
+{{- if or .Values.minio.enabled .Values.kafkaUi.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "dl-poc.fullname" . }}-infra-ingress
+  namespace: {{ include "dl-poc.minioNamespace" . }}
+  labels:
+    {{- include "dl-poc.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className | quote }}
+  {{- if .Values.ingress.tls }}
+  tls:
+    {{- toYaml .Values.ingress.tls | nindent 4 }}
+  {{- end }}
+  rules:
+    # MinIO Console Ingress
+    {{- if .Values.minio.enabled }}
+    - host: {{ .Values.ingress.hosts.minio | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "dl-poc.fullname" . }}-minio
+                port:
+                  number: 9001
+    {{- end }}
+
+    # Kafka UI Ingress
+    {{- if .Values.kafkaUi.enabled }}
+    - host: {{ .Values.ingress.hosts.kafkaUi | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "dl-poc.fullname" . }}-kafka-ui
+                port:
+                  number: 8080
+    {{- end }}
+{{- end }}
+
+---
+
+# ====================================================
+# 2. Core Service Layer Ingress (ns-dl-apps)
+# ====================================================
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "dl-poc.fullname" . }}-apps-ingress
+  namespace: {{ include "dl-poc.appsNamespace" . }}
+  labels:
+    {{- include "dl-poc.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className | quote }}
+  {{- if .Values.ingress.tls }}
+  tls:
+    {{- toYaml .Values.ingress.tls | nindent 4 }}
+  {{- end }}
+  rules:
+    # Kong API Gateway Proxy Ingress
+    - host: {{ .Values.ingress.hosts.apiGateway | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "dl-poc.fullname" . }}-api-gateway
+                port:
+                  number: 8106
+
+---
+
+# ====================================================
+# 3. Simulator / Testing Layer Ingress (ns-dl-mocks)
+# ====================================================
+{{- if .Values.dashboard.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "dl-poc.fullname" . }}-mocks-ingress
+  namespace: {{ include "dl-poc.dashboardNamespace" . }}
+  labels:
+    {{- include "dl-poc.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className | quote }}
+  {{- if .Values.ingress.tls }}
+  tls:
+    {{- toYaml .Values.ingress.tls | nindent 4 }}
+  {{- end }}
+  rules:
+    # POC Dashboard Ingress
+    - host: {{ .Values.ingress.hosts.dashboard | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "dl-poc.fullname" . }}-dashboard
+                port:
+                  number: 8000
+{{- end }}
+{{- end }}

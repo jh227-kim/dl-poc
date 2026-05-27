@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "dl-poc.fullname" . }}-api-gateway
+  namespace: {{ include "dl-poc.apiGatewayNamespace" . }}
+  labels:
+    {{- include "dl-poc.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "dl-poc.selectorLabels" . | nindent 6 }}
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        {{- include "dl-poc.selectorLabels" . | nindent 8 }}
+        app: api-gateway
+    spec:
+      containers:
+        - name: api-gateway
+          image: {{ .Values.apiGateway.image }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8106
+              name: proxy
+          env:
+            - name: KONG_DATABASE
+              value: "off"
+            - name: KONG_DECLARATIVE_CONFIG
+              value: "/usr/local/kong/kong.yml"
+            - name: KONG_PROXY_LISTEN
+              value: "0.0.0.0:8106"
+            - name: KONG_LOG_LEVEL
+              value: "info"
+          volumeMounts:
+            - name: kong-config
+              mountPath: /usr/local/kong/kong.yml
+              subPath: kong.yml
+      volumes:
+        - name: kong-config
+          configMap:
+            name: {{ include "dl-poc.fullname" . }}-kong-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "dl-poc.fullname" . }}-api-gateway
+  namespace: {{ include "dl-poc.apiGatewayNamespace" . }}
+  labels:
+    {{- include "dl-poc.labels" . | nindent 4 }}
+spec:
+  ports:
+    - port: 8106
+      targetPort: 8106
+      name: proxy
+  selector:
+    {{- include "dl-poc.selectorLabels" . | nindent 4 }}
+    app: api-gateway

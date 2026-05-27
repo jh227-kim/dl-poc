@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "dl-poc.fullname" . }}-serving-service
+  namespace: {{ include "dl-poc.appsNamespace" . }}
+  labels:
+    {{- include "dl-poc.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "dl-poc.selectorLabels" . | nindent 6 }}
+      app: serving-service
+  template:
+    metadata:
+      labels:
+        {{- include "dl-poc.selectorLabels" . | nindent 8 }}
+        app: serving-service
+    spec:
+      containers:
+        - name: serving-service
+          image: {{ .Values.servingService.image }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            - name: ICEBERG_CATALOG_URI
+              value: {{ include "dl-poc.postgresUri" . | quote }}
+            - name: MINIO_ENDPOINT
+              value: {{ include "dl-poc.minioEndpoint" . | quote }}
+            - name: SERVING_PRIVILEGED_KEY
+              value: "super-secret-privileged-key"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "dl-poc.fullname" . }}-serving-service
+  namespace: {{ include "dl-poc.appsNamespace" . }}
+  labels:
+    {{- include "dl-poc.labels" . | nindent 4 }}
+spec:
+  ports:
+    - port: 8000
+      targetPort: 8000
+      name: http
+  selector:
+    {{- include "dl-poc.selectorLabels" . | nindent 4 }}
+    app: serving-service

@@ -1,0 +1,49 @@
+{{- if .Values.mocks.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "dl-poc.fullname" . }}-supply-mock-service
+  namespace: {{ include "dl-poc.mocksNamespace" . }}
+  labels:
+    {{- include "dl-poc.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "dl-poc.selectorLabels" . | nindent 6 }}
+      app: supply-mock-service
+  template:
+    metadata:
+      labels:
+        {{- include "dl-poc.selectorLabels" . | nindent 8 }}
+        app: supply-mock-service
+    spec:
+      containers:
+        - name: supply-mock-service
+          image: {{ .Values.mocks.image.supplyMock }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: {{ include "dl-poc.kafkaBootstrap" . | quote }}
+            - name: KAFKA_INGEST_TOPIC
+              value: "mail.events"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "dl-poc.fullname" . }}-supply-mock-service
+  namespace: {{ include "dl-poc.mocksNamespace" . }}
+  labels:
+    {{- include "dl-poc.labels" . | nindent 4 }}
+spec:
+  ports:
+    - port: 8000
+      targetPort: 8000
+      name: http
+  selector:
+    {{- include "dl-poc.selectorLabels" . | nindent 4 }}
+    app: supply-mock-service
+{{- end -}}
