@@ -229,6 +229,9 @@ services:
       - kafka
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - .:/app
     restart: always
 
 volumes:
