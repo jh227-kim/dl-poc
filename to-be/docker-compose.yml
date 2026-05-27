@@ -10,6 +10,18 @@ services:
       - minio_data:/data
     command: server /data --console-address ":9001"
 
+  # Auto-provision MinIO Bucket
+  minio-init:
+    image: minio/mc
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until (/usr/bin/mc alias set myminio http://minio:9000 admin password) do echo 'Waiting for MinIO...' && sleep 1; done;
+      /usr/bin/mc mb --ignore-existing myminio/warehouse;
+      exit 0;
+      "
+
   # Iceberg 카탈로그 DB
   postgres:
     image: postgres:15
@@ -193,6 +205,7 @@ services:
       - kafka
       - minio
       - postgres
+      - minio-init
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
       - ICEBERG_CATALOG_JDBC_URI=jdbc:postgresql://postgres:5432/iceberg_catalog
@@ -216,6 +229,9 @@ services:
       - kafka
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - PYTHONUNBUFFERED=1
+    volumes:
+      - .:/app
     restart: always
 
 volumes:

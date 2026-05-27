@@ -22,7 +22,6 @@
 | | `test_dlq.py` | Kafka 고의 장애를 통한 실시간 DLQ 유입 및 자가 복구 검증 모듈 |
 | | `mail_event_publish.py` | Kafka 브로커에 1회성 이벤트를 직송출하는 테스트 도구 |
 | | `kafka-smoke.*` | OS별 로컬 카프카 토픽 검증용 스크립트 모음 |
-| **`docs/`** <br>(아키텍처 문서) | `dlq_architecture.md` | 실시간 Kafka DLQ Redrive 및 Self-Healing 시퀀스 다이어그램 보고서 |
 | **`helm/`** <br>(K8s 배포 패키지) | `dl-poc/` | 네임스페이스 격리 및 GCP Managed/로컬 인프라를 동적 스위칭하는 Helm Chart |
 
 ---
@@ -106,3 +105,44 @@ $ kubectl get ingress -n dl-poc
 <조회된_INGRESS_IP> minio.dl-poc.local kafka-ui.dl-poc.local api.dl-poc.local dashboard.dl-poc.local
 ```
 바인딩 후 브라우저를 켜고 `http://dashboard.dl-poc.local` 과 같이 도메인 주소로 즉시 테스트가 가능합니다.
+
+---
+
+## 4. 신규 수집 시스템 추가 가이드 (일정, 결재, 게시 등)
+
+본 플랫폼은 어댑터 패턴 기반으로 격리 설계되어 있어 새로운 데이터 공급 시스템을 손쉽게 확장할 수 있습니다. 예를 들어 **일정(Schedule)** 시스템을 추가하는 절차는 다음과 같습니다.
+
+### 1단계: 도메인 어댑터 구현 (`libs/datalake/adapters/`)
+`libs/datalake/adapters/schedule.py` 파일을 생성하고 `SupplyAdapter` 인터페이스를 구현합니다.
+- `source`: `"schedule-supply-default"`
+- `ingest_topic`: `"schedule.events"`
+- `ready_topic`: `"schedule.ready"`
+- `dlq_topic`: `"schedule.events.dlq"`
+- `entity_id_field`: `"schedule_id"`
+- `fetch_from_supply()` 및 `validate_raw()` 등 추상 메서드들의 비즈니스 로직 작성.
+
+### 2단계: 도메인 Iceberg 저장 레이어 구현 (`libs/datalake/layers/`)
+`libs/datalake/layers/schedule.py` 파일을 생성하고 일정 도메인에 대한 Iceberg 테이블 스키마 DDL 정의 및 `save_to_silver`, `save_to_gold`, `save_to_quarantine` 등의 영속화 헬퍼 함수를 구현합니다.
+
+### 3단계: Spark 스트리밍 실행기 생성 (`apps/spark/`)
+`apps/spark/spark_ingest_schedule.py` 파일을 작성하여 일정 어댑터(`ScheduleAdapter`)를 주입하고 스트리밍 질의를 기동시킵니다.
+```python
+from datalake.adapters.schedule import ScheduleAdapter
+from datalake.ingest_runner import run_streaming_ingest
+
+def main():
+    adapter = ScheduleAdapter()
+    run_streaming_ingest(adapter, checkpoint="s3a://warehouse/.spark-checkpoints/schedule-ingest")
+```
+
+### 4단계: 다중 테넌트 DLQ 프로세서 토픽 설정
+`spark-dlq-processor`의 환경 변수 `KAFKA_DLQ_TOPIC`에 콤마로 구분하여 신규 DLQ 토픽을 등록합니다.
+- **Docker Compose (`docker-compose.yml`):**
+  ```yaml
+  spark-dlq-processor:
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - KAFKA_DLQ_TOPIC=mail.events.dlq,schedule.events.dlq,approval.events.dlq,board.events.dlq
+  ```
+설정 등록 후 재시작 시, 프로세서 데몬은 자동으로 추가된 모든 DLQ 토픽들을 동시 모니터링하며, 장애 복구 시 원천 토픽으로 메시지를 동적 재송출(Redrive)합니다.
+
