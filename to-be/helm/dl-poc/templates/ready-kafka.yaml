@@ -1,23 +1,23 @@
-{{- if .Values.kafka.enabled -}}
+{{- if .Values.readyKafka.enabled -}}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "dl-poc.fullname" . }}-kafka
-  namespace: {{ include "dl-poc.kafkaNamespace" . }}
+  name: {{ include "dl-poc.fullname" . }}-ready-kafka
+  namespace: {{ include "dl-poc.readyKafkaNamespace" . }}
   labels:
     {{- include "dl-poc.labels" . | nindent 4 }}
 spec:
-  serviceName: {{ include "dl-poc.fullname" . }}-kafka
-  replicas: {{ .Values.kafka.replicas }}
+  serviceName: {{ include "dl-poc.fullname" . }}-ready-kafka
+  replicas: {{ .Values.readyKafka.replicas }}
   selector:
     matchLabels:
       {{- include "dl-poc.selectorLabels" . | nindent 6 }}
-      app: kafka
+      app: ready-kafka
   template:
     metadata:
       labels:
         {{- include "dl-poc.selectorLabels" . | nindent 8 }}
-        app: kafka
+        app: ready-kafka
     spec:
       affinity:
         podAntiAffinity:
@@ -27,11 +27,11 @@ spec:
                   - key: app
                     operator: In
                     values:
-                      - kafka
+                      - ready-kafka
               topologyKey: "kubernetes.io/hostname"
       containers:
         - name: kafka
-          image: {{ .Values.kafka.image }}
+          image: {{ .Values.readyKafka.image }}
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 9092
@@ -39,18 +39,18 @@ spec:
             - containerPort: 29092
               name: clusterport
           resources:
-            {{- toYaml .Values.kafka.resources | nindent 12 }}
+            {{- toYaml .Values.readyKafka.resources | nindent 12 }}
           env:
             - name: KAFKA_BROKER_ID
               value: "-1"
             - name: KAFKA_ZOOKEEPER_CONNECT
-              value: "{{ include "dl-poc.fullname" . }}-zookeeper.{{ include "dl-poc.kafkaNamespace" . }}.svc.cluster.local:2181"
+              value: "{{ include "dl-poc.fullname" . }}-ready-zookeeper.{{ include "dl-poc.readyKafkaNamespace" . }}.svc.cluster.local:2181"
             - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
               value: "PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT"
             - name: KAFKA_LISTENERS
               value: "PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092"
             - name: KAFKA_ADVERTISED_LISTENERS
-              value: "PLAINTEXT://{{ include "dl-poc.fullname" . }}-kafka.{{ include "dl-poc.kafkaNamespace" . }}.svc.cluster.local:29092,PLAINTEXT_HOST://localhost:9092"
+              value: "PLAINTEXT://{{ include "dl-poc.fullname" . }}-ready-kafka.{{ include "dl-poc.readyKafkaNamespace" . }}.svc.cluster.local:29092,PLAINTEXT_HOST://localhost:9092"
             - name: KAFKA_INTER_BROKER_LISTENER_NAME
               value: "PLAINTEXT"
             - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
@@ -60,11 +60,11 @@ spec:
           volumeMounts:
             - name: kafka-data
               mountPath: /var/lib/kafka/data
-      {{- with .Values.kafka.nodeSelector }}
+      {{- with .Values.readyKafka.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.kafka.tolerations }}
+      {{- with .Values.readyKafka.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
@@ -76,16 +76,16 @@ spec:
           - ReadWriteOnce
         resources:
           requests:
-            storage: {{ .Values.kafka.persistence.size }}
-        {{- if .Values.kafka.persistence.storageClassName }}
-        storageClassName: {{ .Values.kafka.persistence.storageClassName }}
+            storage: {{ .Values.readyKafka.persistence.size }}
+        {{- if .Values.readyKafka.persistence.storageClassName }}
+        storageClassName: {{ .Values.readyKafka.persistence.storageClassName }}
         {{- end }}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "dl-poc.fullname" . }}-kafka
-  namespace: {{ include "dl-poc.kafkaNamespace" . }}
+  name: {{ include "dl-poc.fullname" . }}-ready-kafka
+  namespace: {{ include "dl-poc.readyKafkaNamespace" . }}
   labels:
     {{- include "dl-poc.labels" . | nindent 4 }}
 spec:
@@ -99,5 +99,5 @@ spec:
       name: clusterport
   selector:
     {{- include "dl-poc.selectorLabels" . | nindent 4 }}
-    app: kafka
+    app: ready-kafka
 {{- end -}}

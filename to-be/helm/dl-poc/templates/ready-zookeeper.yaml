@@ -1,23 +1,23 @@
-{{- if .Values.kafka.enabled -}}
+{{- if .Values.readyKafka.enabled -}}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "dl-poc.fullname" . }}-zookeeper
-  namespace: {{ include "dl-poc.kafkaNamespace" . }}
+  name: {{ include "dl-poc.fullname" . }}-ready-zookeeper
+  namespace: {{ include "dl-poc.readyKafkaNamespace" . }}
   labels:
     {{- include "dl-poc.labels" . | nindent 4 }}
 spec:
-  serviceName: {{ include "dl-poc.fullname" . }}-zookeeper
-  replicas: {{ .Values.zookeeper.replicas }}
+  serviceName: {{ include "dl-poc.fullname" . }}-ready-zookeeper
+  replicas: {{ .Values.readyZookeeper.replicas }}
   selector:
     matchLabels:
       {{- include "dl-poc.selectorLabels" . | nindent 6 }}
-      app: zookeeper
+      app: ready-zookeeper
   template:
     metadata:
       labels:
         {{- include "dl-poc.selectorLabels" . | nindent 8 }}
-        app: zookeeper
+        app: ready-zookeeper
     spec:
       affinity:
         podAntiAffinity:
@@ -27,17 +27,17 @@ spec:
                   - key: app
                     operator: In
                     values:
-                      - zookeeper
+                      - ready-zookeeper
               topologyKey: "kubernetes.io/hostname"
       containers:
         - name: zookeeper
-          image: {{ .Values.zookeeper.image }}
+          image: {{ .Values.readyZookeeper.image }}
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 2181
               name: client
           resources:
-            {{- toYaml .Values.zookeeper.resources | nindent 12 }}
+            {{- toYaml .Values.readyZookeeper.resources | nindent 12 }}
           env:
             - name: ZOOKEEPER_CLIENT_PORT
               value: "2181"
@@ -51,11 +51,11 @@ spec:
       volumes:
         - name: zookeeper-log
           emptyDir: {}
-      {{- with .Values.zookeeper.nodeSelector }}
+      {{- with .Values.readyZookeeper.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.zookeeper.tolerations }}
+      {{- with .Values.readyZookeeper.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
@@ -67,16 +67,16 @@ spec:
           - ReadWriteOnce
         resources:
           requests:
-            storage: {{ .Values.zookeeper.persistence.size }}
-        {{- if .Values.zookeeper.persistence.storageClassName }}
-        storageClassName: {{ .Values.zookeeper.persistence.storageClassName }}
+            storage: {{ .Values.readyZookeeper.persistence.size }}
+        {{- if .Values.readyZookeeper.persistence.storageClassName }}
+        storageClassName: {{ .Values.readyZookeeper.persistence.storageClassName }}
         {{- end }}
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "dl-poc.fullname" . }}-zookeeper
-  namespace: {{ include "dl-poc.kafkaNamespace" . }}
+  name: {{ include "dl-poc.fullname" . }}-ready-zookeeper
+  namespace: {{ include "dl-poc.readyKafkaNamespace" . }}
   labels:
     {{- include "dl-poc.labels" . | nindent 4 }}
 spec:
@@ -87,5 +87,5 @@ spec:
       name: client
   selector:
     {{- include "dl-poc.selectorLabels" . | nindent 4 }}
-    app: zookeeper
+    app: ready-zookeeper
 {{- end -}}

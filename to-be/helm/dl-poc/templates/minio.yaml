@@ -1,29 +1,13 @@
 {{- if .Values.minio.enabled -}}
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: {{ include "dl-poc.fullname" . }}-minio-pvc
-  namespace: {{ include "dl-poc.minioNamespace" . }}
-  labels:
-    {{- include "dl-poc.labels" . | nindent 4 }}
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: {{ .Values.minio.persistence.size }}
-  {{- if .Values.minio.persistence.storageClassName }}
-  storageClassName: {{ .Values.minio.persistence.storageClassName }}
-  {{- end }}
----
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: {{ include "dl-poc.fullname" . }}-minio
   namespace: {{ include "dl-poc.minioNamespace" . }}
   labels:
     {{- include "dl-poc.labels" . | nindent 4 }}
 spec:
+  serviceName: {{ include "dl-poc.fullname" . }}-minio
   replicas: 1
   selector:
     matchLabels:
@@ -53,10 +37,26 @@ spec:
           volumeMounts:
             - name: minio-data
               mountPath: /data
-      volumes:
-        - name: minio-data
-          persistentVolumeClaim:
-            claimName: {{ include "dl-poc.fullname" . }}-minio-pvc
+      {{- with .Values.minio.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.minio.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  volumeClaimTemplates:
+    - metadata:
+        name: minio-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ .Values.minio.persistence.size }}
+        {{- if .Values.minio.persistence.storageClassName }}
+        storageClassName: {{ .Values.minio.persistence.storageClassName }}
+        {{- end }}
 ---
 apiVersion: v1
 kind: Service
@@ -66,6 +66,7 @@ metadata:
   labels:
     {{- include "dl-poc.labels" . | nindent 4 }}
 spec:
+  clusterIP: None
   ports:
     - port: 9000
       targetPort: 9000

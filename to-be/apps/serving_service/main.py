@@ -5,14 +5,13 @@ import os
 from pathlib import Path
 import sys
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, HTTPException
 from pyiceberg.catalog import load_catalog
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.append(str(ROOT_DIR))
 
-from datalake.encryption import decrypt_personal_fields
 
 app = FastAPI(title="Data Serving API 서비스")
 
@@ -22,7 +21,6 @@ ICEBERG_CATALOG_URI = os.environ.get(
     "postgresql://admin:password@localhost:5432/iceberg_catalog",
 )
 MINIO_ENDPOINT = os.environ.get("MINIO_ENDPOINT", "http://127.0.0.1:9000")
-PRIVILEGED_KEY = os.environ.get("SERVING_PRIVILEGED_KEY", "")
 
 print(u">>> [Serving] PyIceberg 엔진 초기화 중...")
 print(f">>> Catalog URI: {ICEBERG_CATALOG_URI}")
@@ -61,10 +59,6 @@ def _safe_timestamp(value) -> str | None:
         return value.isoformat()
     return str(value)
 
-def _is_privileged(privileged_key: str | None) -> bool:
-    if not PRIVILEGED_KEY:
-        return False
-    return privileged_key == PRIVILEGED_KEY
 
 
 @app.get("/")
@@ -73,7 +67,7 @@ def health():
 
 
 @app.get("/mails/{mail_id}")
-def get_lake_mail(mail_id: str, x_consumer_privileged_key: str | None = Header(default=None)):
+def get_lake_mail(mail_id: str):
     """
     운영 DB 개입 차단.
     Postgres 카탈로그 메타데이터 정보를 추적하여 MinIO 실제 데이터 저장 레이어에서
@@ -111,26 +105,13 @@ def get_lake_mail(mail_id: str, x_consumer_privileged_key: str | None = Header(d
             "occurred_at": _safe_timestamp(row.get("occurred_at")),
         }
 
-        privileged = _is_privileged(x_consumer_privileged_key)
-        if privileged:
-            mail = decrypt_personal_fields(mail)
-
         return {
             "mail_id": _safe_text(row.get("mail_id")),
             "mail": mail,
             "source": "local.gold.mail",
-            "privileged": privileged,
         }
     except HTTPException:
         raise
     except Exception as exc:
-        print(f">>> [Serving Error] Gold 레이어 데이터 조회 및 처리(복호화) 중 예기치 않은 에러 발생: {exc}")
+        print(f">>> [Serving Error] Gold 레이어 데이터 조회 및 처리 중 예기치 않은 에러 발생: {exc}")
         raise HTTPException(status_code=500, detail=f"Failed to process gold layer data: {exc}")
-
-
-@app.get("/mails/debug/headers")
-def debug_headers(x_consumer_privileged_key: str | None = Header(default=None)):
-    return {
-        "x_consumer_privileged_key": x_consumer_privileged_key,
-        "is_privileged": _is_privileged(x_consumer_privileged_key)
-    }

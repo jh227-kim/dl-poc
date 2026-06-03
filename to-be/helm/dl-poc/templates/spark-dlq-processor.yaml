@@ -6,7 +6,7 @@ metadata:
   labels:
     {{- include "dl-poc.labels" . | nindent 4 }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.sparkDlqProcessor.replicas }}
   selector:
     matchLabels:
       {{- include "dl-poc.selectorLabels" . | nindent 6 }}
@@ -17,11 +17,23 @@ spec:
         {{- include "dl-poc.selectorLabels" . | nindent 8 }}
         app: spark-dlq-processor
     spec:
+      {{- with .Values.sparkDlqProcessor.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.sparkDlqProcessor.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: spark-dlq-processor
           image: {{ .Values.sparkDlqProcessor.image }}
           imagePullPolicy: IfNotPresent
           command: ["python3", "apps/spark/spark_dlq_processor.py"]
+          resources:
+            {{- toYaml .Values.sparkDlqProcessor.resources | nindent 12 }}
           env:
             - name: KAFKA_BOOTSTRAP_SERVERS
               value: {{ include "dl-poc.kafkaBootstrap" . | quote }}
+            - name: KAFKA_DLQ_TOPIC
+              value: {{ .Values.sparkDlqProcessor.kafkaDlqTopic | quote }}

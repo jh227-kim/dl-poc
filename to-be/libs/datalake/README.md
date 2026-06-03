@@ -171,8 +171,7 @@ if __name__ == "__main__":
 ## 암호화·Serving (참고)
 
 - PII: `encryption.py` — `sender`, `receiver` 등 → `*_enc` (AES-256-GCM)
-- Serving 복호화: env `SERVING_PRIVILEGED_KEY` + 요청 헤더 `X-Consumer-Privileged-Key` (서버 env만으로는 자동 복호화 안 됨)
-- 소비 기본 응답: `sender_enc` 등 (평문 DTO는 Serving/소비 개선 시)
+- 소비 기본 응답: `sender_enc` 등 비식별화(암호화된) 데이터 형태 그대로 서빙
 
 ---
 

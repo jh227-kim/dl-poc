@@ -67,6 +67,13 @@ Kafka Namespace Resolver
 {{- end -}}
 
 {{/*
+Ready Kafka Namespace Resolver
+*/}}
+{{- define "dl-poc.readyKafkaNamespace" -}}
+{{- .Values.readyKafka.namespace | default "ns-dl-infra" -}}
+{{- end -}}
+
+{{/*
 Kafka-UI Namespace Resolver
 */}}
 {{- define "dl-poc.kafkaUiNamespace" -}}
@@ -191,3 +198,19 @@ Kafka Bootstrap Servers FQDN Helper
 {{- .Values.externalKafka.bootstrapServers -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Ready Kafka Bootstrap Servers FQDN Helper
+*/}}
+{{- define "dl-poc.readyKafkaBootstrap" -}}
+{{- if .Values.readyKafka.enabled -}}
+{{- printf "%s-ready-kafka.%s.svc.cluster.local:29092" (include "dl-poc.fullname" .) (include "dl-poc.readyKafkaNamespace" .) -}}
+{{- else -}}
+{{- if .Values.externalReadyKafka.bootstrapServers -}}
+{{- .Values.externalReadyKafka.bootstrapServers -}}
+{{- else -}}
+{{- include "dl-poc.kafkaBootstrap" . -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+

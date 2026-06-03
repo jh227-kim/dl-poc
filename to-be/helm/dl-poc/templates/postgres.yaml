@@ -1,29 +1,13 @@
 {{- if .Values.postgres.enabled -}}
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: {{ include "dl-poc.fullname" . }}-postgres-pvc
-  namespace: {{ include "dl-poc.postgresNamespace" . }}
-  labels:
-    {{- include "dl-poc.labels" . | nindent 4 }}
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: {{ .Values.postgres.persistence.size }}
-  {{- if .Values.postgres.persistence.storageClassName }}
-  storageClassName: {{ .Values.postgres.persistence.storageClassName }}
-  {{- end }}
----
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: {{ include "dl-poc.fullname" . }}-postgres
   namespace: {{ include "dl-poc.postgresNamespace" . }}
   labels:
     {{- include "dl-poc.labels" . | nindent 4 }}
 spec:
+  serviceName: {{ include "dl-poc.fullname" . }}-postgres
   replicas: 1
   selector:
     matchLabels:
@@ -52,10 +36,26 @@ spec:
           volumeMounts:
             - name: postgres-data
               mountPath: /var/lib/postgresql/data
-      volumes:
-        - name: postgres-data
-          persistentVolumeClaim:
-            claimName: {{ include "dl-poc.fullname" . }}-postgres-pvc
+      {{- with .Values.postgres.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.postgres.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: {{ .Values.postgres.persistence.size }}
+        {{- if .Values.postgres.persistence.storageClassName }}
+        storageClassName: {{ .Values.postgres.persistence.storageClassName }}
+        {{- end }}
 ---
 apiVersion: v1
 kind: Service
@@ -65,6 +65,7 @@ metadata:
   labels:
     {{- include "dl-poc.labels" . | nindent 4 }}
 spec:
+  clusterIP: None
   ports:
     - port: 5432
       targetPort: 5432

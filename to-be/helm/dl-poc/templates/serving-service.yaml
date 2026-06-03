@@ -6,7 +6,7 @@ metadata:
   labels:
     {{- include "dl-poc.labels" . | nindent 4 }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.servingService.replicas }}
   selector:
     matchLabels:
       {{- include "dl-poc.selectorLabels" . | nindent 6 }}
@@ -17,6 +17,24 @@ spec:
         {{- include "dl-poc.selectorLabels" . | nindent 8 }}
         app: serving-service
     spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - serving-service
+              topologyKey: "kubernetes.io/hostname"
+      {{- with .Values.servingService.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.servingService.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: serving-service
           image: {{ .Values.servingService.image }}
@@ -24,6 +42,8 @@ spec:
           ports:
             - containerPort: 8000
               name: http
+          resources:
+            {{- toYaml .Values.servingService.resources | nindent 12 }}
           env:
             - name: ICEBERG_CATALOG_URI
               value: {{ include "dl-poc.postgresUri" . | quote }}

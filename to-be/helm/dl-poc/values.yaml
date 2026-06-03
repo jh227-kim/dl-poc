@@ -1,4 +1,4 @@
-# Default values for dl-poc.
+# Default values for dl-poc. (Verification & Testing Environment)
 # This is a YAML-formatted file.
 
 nameOverride: ""
@@ -14,6 +14,13 @@ postgres:
   persistence:
     size: 8Gi
     storageClassName: ""
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "512Mi"
+    limits:
+      cpu: "1"
+      memory: "1Gi"
 
 minio:
   enabled: true
@@ -24,27 +31,89 @@ minio:
   persistence:
     size: 10Gi
     storageClassName: ""
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "512Mi"
+    limits:
+      cpu: "1"
+      memory: "1Gi"
 
 zookeeper:
   enabled: true
-  namespace: "ns-dl-infra"
+  namespace: "ns-dl-pipeline"
   image: confluentinc/cp-zookeeper:7.5.3
   persistence:
     size: 5Gi
     storageClassName: ""
+  replicas: 1
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
 
 kafka:
   enabled: true
-  namespace: "ns-dl-infra"
+  namespace: "ns-dl-pipeline"
   image: confluentinc/cp-kafka:7.5.3
   persistence:
     size: 10Gi
     storageClassName: ""
+  replicas: 1
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "2"
+      memory: "2Gi"
+
+readyZookeeper:
+  enabled: true
+  namespace: "ns-dl-serving"
+  image: confluentinc/cp-zookeeper:7.5.3
+  persistence:
+    size: 5Gi
+    storageClassName: ""
+  replicas: 1
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+readyKafka:
+  enabled: true
+  namespace: "ns-dl-serving"
+  image: confluentinc/cp-kafka:7.5.3
+  persistence:
+    size: 5Gi
+    storageClassName: ""
+  replicas: 1
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "2"
+      memory: "2Gi"
 
 kafkaUi:
   enabled: true
   namespace: "ns-dl-infra"
   image: provectuslabs/kafka-ui:latest
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
 
 # ----------------------------------------------------
 # External GCP Services Configuration
@@ -67,6 +136,10 @@ externalKafka:
   # GCP Managed Service for Apache Kafka / Confluent Cloud Bootstrap server
   bootstrapServers: "gcp-managed-kafka-bootstrap-servers:9092"
 
+externalReadyKafka:
+  # GCP Managed Service for Apache Kafka / Confluent Cloud Ready Topic Bootstrap server
+  bootstrapServers: "gcp-managed-ready-kafka-bootstrap-servers:9092"
+
 # ----------------------------------------------------
 # Core Streaming Pipeline (ns-dl-pipeline)
 # ----------------------------------------------------
@@ -74,10 +147,34 @@ sparkMailIngest:
   namespace: "ns-dl-pipeline" 
   image: spark-mail-ingest:latest
   sparkCheckpointLocation: "s3a://warehouse/.spark-checkpoints/mail-ingest"
+  kafkaDlqTopic: "mail.events.dlq"
+  replicas: 1
+  # Spark Master (local[1] for dev, k8s://... for prod)
+  sparkMaster: "local[1]"
+  # Executor Sizing (Active only when sparkMaster is k8s://...)
+  sparkExecutorInstances: 1
+  sparkExecutorCores: "1"
+  sparkExecutorMemory: "1Gi"
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "2"
+      memory: "2Gi"
 
 sparkDlqProcessor:
   namespace: "ns-dl-pipeline" 
   image: spark-dlq-processor:latest
+  kafkaDlqTopic: "mail.events.dlq"
+  replicas: 1
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "512Mi"
+    limits:
+      cpu: "1"
+      memory: "1Gi"
 
 # ----------------------------------------------------
 # Core Serving Applications (ns-dl-serving)
@@ -85,10 +182,26 @@ sparkDlqProcessor:
 servingService:
   namespace: "ns-dl-serving" 
   image: serving-service:latest
+  replicas: 1
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "512Mi"
+    limits:
+      cpu: "1"
+      memory: "1Gi"
 
 apiGateway:
   namespace: "ns-dl-serving" 
   image: kong:latest
+  replicas: 1
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "512Mi"
+    limits:
+      cpu: "1"
+      memory: "1Gi"
 
 # ----------------------------------------------------
 # Simulator & Testing Tools (ns-dl-mocks)
@@ -99,11 +212,27 @@ mocks:
   image:
     consumerMock: consumer-mock-service:latest
     supplyMock: supply-mock-service:latest
+  replicas: 1
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
 
 dashboard:
   enabled: true
   namespace: "ns-dl-mocks" 
   image: poc-dashboard:latest
+  replicas: 1
+  resources:
+    requests:
+      cpu: "200m"
+      memory: "256Mi"
+    limits:
+      cpu: "1"
+      memory: "512Mi"
 
 # ----------------------------------------------------
 # Ingress Controller Config (Domain-based routing)

@@ -195,6 +195,7 @@ services:
       - postgres
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - KAFKA_DLQ_TOPIC=mail.events.dlq
       - ICEBERG_CATALOG_JDBC_URI=jdbc:postgresql://postgres:5432/iceberg_catalog
       - MINIO_ENDPOINT=http://minio:9000
       - MINIO_ACCESS_KEY=admin
@@ -216,6 +217,7 @@ services:
       - kafka
     environment:
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - KAFKA_DLQ_TOPIC=mail.events.dlq
     restart: always
 
 volumes:

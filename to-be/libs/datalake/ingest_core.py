@@ -73,11 +73,12 @@ def _publish_ready(
     entity_id: str,
     status: str = "ready",
 ) -> None:
-    producer = _get_ready_kafka_producer(kafka_bootstrap, adapter.ready_topic)
+    ready_bootstrap = os.environ.get("KAFKA_READY_BOOTSTRAP_SERVERS", kafka_bootstrap)
+    producer = _get_ready_kafka_producer(ready_bootstrap, adapter.ready_topic)
     producer.send(adapter.ready_topic, adapter.ready_payload(entity_id, status))
     producer.flush()
     print(
-        f"[ingest] -> {adapter.ready_topic} 적재 완료 알림 발행 완료 | "
+        f"[ingest] -> {adapter.ready_topic} ({ready_bootstrap}) 적재 완료 알림 발행 완료 | "
         f"{adapter.entity_id_field}={entity_id}"
     )
 

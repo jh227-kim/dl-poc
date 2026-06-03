@@ -1,0 +1,68 @@
+// https://sequencediagram.org/
+
+    autonumber
+    participant "Knox 서비스 (공급)" as Knox
+    participantgroup #d0def5 ;0 통합 데이터 플랫폼
+
+    participant "Inbound Topic (Kafka)" as Inbound 
+    participant "spark-ingest (수집기)" as Ingest
+    participant "minio (데이터 레이크)" as MinIO
+    participant "PostgreSQL (카탈로그 DB)" as Catalog
+    participant "DLQ Topic (Kafka)" as DLQ
+    participant "spark-dlq-processor (자가복구 데몬)" as DLQProc
+    end
+
+    note over Knox, Ingest: [외부 API 장애 상황]
+    Ingest->>Inbound: 1. 배치 이벤트 컨슘 (raw_json)
+    activate Inbound
+    deactivateafter Inbound
+    activate Ingest
+    
+    Ingest->>Knox: 2. 상세 조회 시도 (GET /mails/{mail_id})
+    activate Knox
+    Knox-->>Ingest: HTTP 500 / Connection Timeout
+    deactivate Knox
+    note over Ingest: DynamicRateLimiter.report_failure_or_latency() 실행 (RPS 감속)
+
+    Ingest->>MinIO: 3. Quarantine 격리 영역 Parquet 파일 쓰기 (S3 API)
+    activate MinIO
+    MinIO-->>Ingest: 격리 적재 완료
+    deactivate MinIO
+
+    Ingest->>Catalog: 4. Quarantine 메타데이터 기록 (JDBC)
+    activate Catalog
+    Catalog-->>Ingest: 기록 완료
+    deactivate Catalog
+
+    Ingest->>DLQ: 5. DLQ 메시지 발행 (retry_count=0, fetch failed 에러 포함)
+    activate DLQ
+    deactivateafter DLQ
+    deactivate Ingest
+
+    note over DLQ, DLQProc: [자가 복구 프로세서 구동]
+    DLQProc->>DLQ: 6. DLQ 토픽 컨슘 (fetch failed 오류 확인)
+    activate DLQ
+    deactivateafter DLQ
+    activate DLQProc
+    note over DLQProc: 7. 일시적 에러 판별 & retry_count <= 3 검증 (통과)
+    note over DLQProc: 5초 대기 (Backoff 지연 실행)
+    DLQProc->>Inbound: 8. Inbound Topic 재전송 (payload 내 _retry_count=1 주입, Key 보존)
+    activate Inbound
+    deactivateafter Inbound
+    deactivate DLQProc
+
+    note over Knox, Ingest: [공급 API 정상 복구 이후]
+    Ingest->>Inbound: 9. 재인입 이벤트 컨슘 (_retry_count=1)
+    activate Inbound
+    deactivateafter Inbound
+    activate Ingest
+    Ingest->>Knox: 10. 상세 조회 재시도 (GET /mails/{mail_id})
+    activate Knox
+    Knox-->>Ingest: 200 OK (정상 응답)
+    deactivate Knox
+    
+    Ingest->>MinIO: 11. Silver/Gold 영역 적재 완료 (S3 API)
+    activate MinIO
+    MinIO-->>Ingest: 적재 완료
+    deactivate MinIO
+    deactivate Ingest

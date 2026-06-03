@@ -7,7 +7,7 @@ metadata:
   labels:
     {{- include "dl-poc.labels" . | nindent 4 }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.dashboard.replicas }}
   selector:
     matchLabels:
       {{- include "dl-poc.selectorLabels" . | nindent 6 }}
@@ -18,6 +18,14 @@ spec:
         {{- include "dl-poc.selectorLabels" . | nindent 8 }}
         app: dashboard
     spec:
+      {{- with .Values.dashboard.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.dashboard.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: dashboard
           image: {{ .Values.dashboard.image }}
@@ -25,6 +33,8 @@ spec:
           ports:
             - containerPort: 8000
               name: http
+          resources:
+            {{- toYaml .Values.dashboard.resources | nindent 12 }}
           env:
             - name: SUPPLY_SERVICE_URL
               value: "http://{{ include "dl-poc.fullname" . }}-supply-mock-service.{{ include "dl-poc.mocksNamespace" . }}.svc.cluster.local:8000"

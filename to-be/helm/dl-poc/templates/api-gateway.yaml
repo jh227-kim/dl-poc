@@ -6,7 +6,7 @@ metadata:
   labels:
     {{- include "dl-poc.labels" . | nindent 4 }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.apiGateway.replicas }}
   selector:
     matchLabels:
       {{- include "dl-poc.selectorLabels" . | nindent 6 }}
@@ -17,6 +17,24 @@ spec:
         {{- include "dl-poc.selectorLabels" . | nindent 8 }}
         app: api-gateway
     spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - api-gateway
+              topologyKey: "kubernetes.io/hostname"
+      {{- with .Values.apiGateway.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.apiGateway.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: api-gateway
           image: {{ .Values.apiGateway.image }}
@@ -24,6 +42,8 @@ spec:
           ports:
             - containerPort: 8106
               name: proxy
+          resources:
+            {{- toYaml .Values.apiGateway.resources | nindent 12 }}
           env:
             - name: KONG_DATABASE
               value: "off"

@@ -1,0 +1,245 @@
+# ----------------------------------------------------
+# Production Environment Override Values (values-prod.yaml)
+# ----------------------------------------------------
+
+# Disable Testing and Mock Services in Production
+mocks:
+  enabled: false
+dashboard:
+  enabled: false
+
+# ----------------------------------------------------
+# Infrastructure Components (ns-dl-infra)
+# ----------------------------------------------------
+postgres:
+  enabled: true
+  resources:
+    requests:
+      cpu: "4"
+      memory: "8Gi"
+    limits:
+      cpu: "4"
+      memory: "8Gi"
+  nodeSelector:
+    dedicated: "shared-infra"
+  tolerations:
+    - key: "dedicated"
+      operator: "Equal"
+      value: "shared-infra"
+      effect: "NoSchedule"
+
+# [운영 환경 고도화 가이드: 수집(Primary) & 조회(Read-Replica) 격리 설정]
+# 대용량 운영 환경에서는 수집단의 극심한 쓰기 트랜잭션 락(Lock)이 조회단에 영향을 주지 않도록,
+# 아래와 같이 Primary(Ingest용 쓰기)와 Read-Replica(Serving용 읽기) 커넥션을 완전히 분리하는 것을 권장합니다.
+#
+# 1. Spark Ingest (수집 엔진) - 메타데이터 쓰기(Primary DB FQDN)
+# externalPostgres:
+#   host: "postgres-primary.dl-infra.svc.cluster.local"
+#   port: 5432
+#   user: "admin"
+#   password: "securepassword"
+#   database: "iceberg_catalog"
+#
+# 2. Serving Service (조회 API) - 메타데이터 읽기(Read-Replica DB FQDN)
+# * Serving Service가 Read-Replica를 전용으로 바라보게 오버라이딩하려면,
+#   아래 servingService 섹션 내의 env 주석을 해제하여 적용합니다.
+# externalPostgresReplica:
+#   host: "postgres-replica.dl-infra.svc.cluster.local"
+#   port: 5432
+#   user: "admin"
+#   password: "securepassword"
+#   database: "iceberg_catalog"
+
+minio:
+  enabled: true
+  resources:
+    requests:
+      cpu: "4"
+      memory: "8Gi"
+    limits:
+      cpu: "4"
+      memory: "8Gi"
+  nodeSelector:
+    dedicated: "shared-infra"
+  tolerations:
+    - key: "dedicated"
+      operator: "Equal"
+      value: "shared-infra"
+      effect: "NoSchedule"
+
+zookeeper:
+  enabled: true
+  replicas: 3
+  resources:
+    requests:
+      cpu: "4"
+      memory: "8Gi"
+    limits:
+      cpu: "4"
+      memory: "8Gi"
+  nodeSelector:
+    dedicated: "ingest"
+  tolerations:
+    - key: "dedicated"
+      operator: "Equal"
+      value: "ingest"
+      effect: "NoSchedule"
+
+kafka:
+  enabled: true
+  replicas: 7
+  persistence:
+    size: 60Ti
+  resources:
+    requests:
+      cpu: "16"
+      memory: "64Gi"
+    limits:
+      cpu: "16"
+      memory: "64Gi"
+  nodeSelector:
+    dedicated: "ingest"
+  tolerations:
+    - key: "dedicated"
+      operator: "Equal"
+      value: "ingest"
+      effect: "NoSchedule"
+
+readyZookeeper:
+  enabled: true
+  replicas: 3
+  resources:
+    requests:
+      cpu: "4"
+      memory: "8Gi"
+    limits:
+      cpu: "4"
+      memory: "8Gi"
+  nodeSelector:
+    dedicated: "serving"
+  tolerations:
+    - key: "dedicated"
+      operator: "Equal"
+      value: "serving"
+      effect: "NoSchedule"
+
+readyKafka:
+  enabled: true
+  replicas: 3
+  persistence:
+    size: 5Ti
+  resources:
+    requests:
+      cpu: "8"
+      memory: "32Gi"
+    limits:
+      cpu: "8"
+      memory: "32Gi"
+  nodeSelector:
+    dedicated: "serving"
+  tolerations:
+    - key: "dedicated"
+      operator: "Equal"
+      value: "serving"
+      effect: "NoSchedule"
+
+kafkaUi:
+  enabled: true
+  resources:
+    requests:
+      cpu: "1"
+      memory: "2Gi"
+    limits:
+      cpu: "1"
+      memory: "2Gi"
+  nodeSelector:
+    dedicated: "shared-infra"
+  tolerations:
+    - key: "dedicated"
+      operator: "Equal"
+      value: "shared-infra"
+      effect: "NoSchedule"
+
+# ----------------------------------------------------
+# Core Streaming Pipeline (ns-dl-pipeline)
+# ----------------------------------------------------
+sparkMailIngest:
+  replicas: 1
+  sparkMaster: "k8s://https://kubernetes.default.svc:443"
+  # Production Distributed Executor Configuration
+  sparkExecutorInstances: 36
+  sparkExecutorCores: "16"
+  sparkExecutorMemory: "64Gi"
+  resources:
+    requests:
+      cpu: "4"
+      memory: "16Gi"
+    limits:
+      cpu: "4"
+      memory: "16Gi"
+  nodeSelector:
+    dedicated: "ingest"
+  tolerations:
+    - key: "dedicated"
+      operator: "Equal"
+      value: "ingest"
+      effect: "NoSchedule"
+
+sparkDlqProcessor:
+  replicas: 1
+  resources:
+    requests:
+      cpu: "2"
+      memory: "4Gi"
+    limits:
+      cpu: "2"
+      memory: "4Gi"
+  nodeSelector:
+    dedicated: "ingest"
+  tolerations:
+    - key: "dedicated"
+      operator: "Equal"
+      value: "ingest"
+      effect: "NoSchedule"
+
+# ----------------------------------------------------
+# Core Serving Applications (ns-dl-serving)
+# ----------------------------------------------------
+servingService:
+  replicas: 3
+  resources:
+    requests:
+      cpu: "4"
+      memory: "8Gi"
+    limits:
+      cpu: "4"
+      memory: "8Gi"
+  nodeSelector:
+    dedicated: "serving"
+  tolerations:
+    - key: "dedicated"
+      operator: "Equal"
+      value: "serving"
+      effect: "NoSchedule"
+  # [운영 이원화] Serving Service가 PostgreSQL Read-Replica를 바라보도록 오버라이드할 때 사용:
+  # (externalPostgresReplica 사용 시 주석을 해제하여 DB 커넥션 정보를 수동 재정의할 수 있습니다.)
+  # env:
+  #   - name: ICEBERG_CATALOG_URI
+  #     value: "postgresql://admin:securepassword@postgres-replica.dl-infra.svc.cluster.local:5432/iceberg_catalog"
+
+apiGateway:
+  replicas: 3
+  resources:
+    requests:
+      cpu: "4"
+      memory: "8Gi"
+    limits:
+      cpu: "4"
+      memory: "8Gi"
+  nodeSelector:
+    dedicated: "serving"
+  tolerations:
+    - key: "dedicated"
+      operator: "Equal"
+      value: "serving"
+      effect: "NoSchedule"

@@ -92,7 +92,6 @@ def create_spark_session(app_name: str, *, enable_iceberg_sql_extensions: bool =
         .config("spark.sql.catalog.local.jdbc.schema-version", "V1")
         .config("spark.driver.host", os.environ.get("SPARK_DRIVER_HOST", "127.0.0.1"))
         .config("spark.driver.bindAddress", os.environ.get("SPARK_DRIVER_BIND_ADDRESS", "127.0.0.1"))
-        .config("spark.master", os.environ.get("SPARK_MASTER", "local[1]"))
         .config("spark.python.worker.reuse", "true")
         .config("spark.network.timeout", "120s")
         .config("spark.sql.execution.arrow.pyspark.enabled", "false")
@@ -100,6 +99,22 @@ def create_spark_session(app_name: str, *, enable_iceberg_sql_extensions: bool =
         .config("spark.streaming.backpressure.initialRate", "1000")
         .config("spark.streaming.kafka.maxRatePerPartition", "1000")
     )
+
+    spark_master = os.environ.get("SPARK_MASTER", "local[1]")
+    builder = builder.config("spark.master", spark_master)
+
+    if spark_master.startswith("k8s://"):
+        builder = (
+            builder
+            .config("spark.executor.instances", os.environ.get("SPARK_EXECUTOR_INSTANCES", "1"))
+            .config("spark.kubernetes.container.image", os.environ.get("SPARK_IMAGE", "spark-mail-ingest:latest"))
+            .config("spark.kubernetes.executor.request.cores", os.environ.get("SPARK_EXECUTOR_CORES", "1"))
+            .config("spark.kubernetes.executor.limit.cores", os.environ.get("SPARK_EXECUTOR_CORES", "1"))
+            .config("spark.kubernetes.executor.request.memory", os.environ.get("SPARK_EXECUTOR_MEMORY", "1Gi"))
+            .config("spark.kubernetes.executor.limit.memory", os.environ.get("SPARK_EXECUTOR_MEMORY", "1Gi"))
+            .config("spark.kubernetes.namespace", os.environ.get("SPARK_POD_NAMESPACE", "ns-dl-pipeline"))
+            .config("spark.kubernetes.authenticate.driver.serviceAccountName", os.environ.get("SPARK_DRIVER_SERVICE_ACCOUNT", "default"))
+        )
 
     if enable_iceberg_sql_extensions:
         builder = (

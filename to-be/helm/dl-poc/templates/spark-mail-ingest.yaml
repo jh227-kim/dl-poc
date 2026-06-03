@@ -6,7 +6,7 @@ metadata:
   labels:
     {{- include "dl-poc.labels" . | nindent 4 }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.sparkMailIngest.replicas }}
   selector:
     matchLabels:
       {{- include "dl-poc.selectorLabels" . | nindent 6 }}
@@ -17,13 +17,28 @@ spec:
         {{- include "dl-poc.selectorLabels" . | nindent 8 }}
         app: spark-mail-ingest
     spec:
+      serviceAccountName: {{ include "dl-poc.fullname" . }}-spark-service-account
+      {{- with .Values.sparkMailIngest.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.sparkMailIngest.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: spark-mail-ingest
           image: {{ .Values.sparkMailIngest.image }}
           imagePullPolicy: IfNotPresent
+          resources:
+            {{- toYaml .Values.sparkMailIngest.resources | nindent 12 }}
           env:
             - name: KAFKA_BOOTSTRAP_SERVERS
               value: {{ include "dl-poc.kafkaBootstrap" . | quote }}
+            - name: KAFKA_READY_BOOTSTRAP_SERVERS
+              value: {{ include "dl-poc.readyKafkaBootstrap" . | quote }}
+            - name: KAFKA_DLQ_TOPIC
+              value: {{ .Values.sparkMailIngest.kafkaDlqTopic | quote }}
             - name: ICEBERG_CATALOG_JDBC_URI
               value: {{ include "dl-poc.postgresJdbcUri" . | quote }}
             - name: MINIO_ENDPOINT
@@ -38,5 +53,19 @@ spec:
               value: "127.0.0.1"
             - name: SPARK_DRIVER_BIND_ADDRESS
               value: "0.0.0.0"
+            - name: SPARK_MASTER
+              value: {{ .Values.sparkMailIngest.sparkMaster | quote }}
+            - name: SPARK_EXECUTOR_INSTANCES
+              value: {{ .Values.sparkMailIngest.sparkExecutorInstances | quote }}
+            - name: SPARK_EXECUTOR_CORES
+              value: {{ .Values.sparkMailIngest.sparkExecutorCores | quote }}
+            - name: SPARK_EXECUTOR_MEMORY
+              value: {{ .Values.sparkMailIngest.sparkExecutorMemory | quote }}
+            - name: SPARK_IMAGE
+              value: {{ .Values.sparkMailIngest.image | quote }}
+            - name: SPARK_POD_NAMESPACE
+              value: {{ .Values.sparkMailIngest.namespace | quote }}
+            - name: SPARK_DRIVER_SERVICE_ACCOUNT
+              value: "{{ include "dl-poc.fullname" . }}-spark-service-account"
             - name: SUPPLY_SERVICE_URL
               value: "http://{{ include "dl-poc.fullname" . }}-supply-mock-service.{{ include "dl-poc.mocksNamespace" . }}.svc.cluster.local:8000"

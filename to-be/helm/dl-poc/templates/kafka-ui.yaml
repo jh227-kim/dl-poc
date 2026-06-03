@@ -27,9 +27,21 @@ spec:
               name: http
           env:
             - name: KAFKA_CLUSTERS_0_NAME
-              value: "local"
+              value: "ingest-kafka"
             - name: KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS
               value: {{ include "dl-poc.kafkaBootstrap" . | quote }}
+            - name: KAFKA_CLUSTERS_1_NAME
+              value: "ready-kafka"
+            - name: KAFKA_CLUSTERS_1_BOOTSTRAPSERVERS
+              value: {{ include "dl-poc.readyKafkaBootstrap" . | quote }}
+      {{- with .Values.kafkaUi.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.kafkaUi.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
 ---
 apiVersion: v1
 kind: Service

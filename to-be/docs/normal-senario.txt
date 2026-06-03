@@ -1,0 +1,86 @@
+// https://sequencediagram.org/
+autonumber
+participant "Knox 서비스 (공급)" as Knox
+
+participantgroup #d0def5 ;0 통합 데이터 플랫폼
+  participant "Inbound Topic (Kafka)" as Inbound
+  participant "spark-ingest (수집기)" as Ingest
+  participant "PostgreSQL (카탈로그 DB)" as Catalog
+  participant "minio (데이터 레이크)" as MinIO
+  participant "Outbound Topic (Kafka)" as Outbound
+  participant "serving-service (조회 API)" as Serving
+  participant "api-gateway (Kong)" as Kong
+end
+
+participant "소비 시스템" as Consumer
+
+    Knox->>Inbound: 변경 이벤트 발행
+    activate Inbound
+    deactivateafter Inbound
+
+    Ingest->>Inbound: 배치 이벤트 컨슘
+    activate Inbound
+    deactivateafter Inbound
+    activate Ingest
+    
+    note over Ingest: 이벤트 스키마 파싱 및 중복 배제 (dedupe_events)
+    note over Ingest: DynamicRateLimiter.throttle() 실행 (RPS 제어)
+    
+    Ingest->>Knox: 데이터 상세 조회 \n(GET /mails/{mail_id})
+    activate Knox
+    Knox-->>Ingest: 200 OK (raw JSON 데이터)
+    deactivate Knox
+    note over Ingest: DynamicRateLimiter.report_success() 실행
+
+    note over Ingest: 비즈니스 검증, 정제 및 PII 필드 암호화
+    
+    Ingest->>Catalog: 적재 버전 비교 조회 \n(SELECT event_version) (JDBC)
+    activate Catalog
+    Catalog-->>Ingest: 기존 적재 버전 정보 반환
+    deactivate Catalog
+    note over Ingest: 버전 비교 검증 수행 (drop_stale)
+
+    Ingest->>MinIO: Silver/Gold 영역 Parquet 파일 쓰기 (S3 API)
+    activate MinIO
+    MinIO-->>Ingest: Parquet 쓰기 완료
+    deactivate MinIO
+
+    Ingest->>Catalog: Iceberg Catalog \n메타데이터 스냅샷 \n업데이트 (JDBC)
+    activate Catalog
+    Catalog-->>Ingest: 메타데이터 업데이트 완료
+    deactivate Catalog
+
+    Ingest->>Outbound: 적재 완료 알림 발행 (mail.ready)
+    activate Outbound
+    deactivateafter Outbound
+    deactivate Ingest
+    
+    // [2단계] 온디맨드 데이터 서빙 (Serving)
+    Consumer->>Outbound: 적재 완료 이벤트 컨숨
+    activate Consumer
+    activate Outbound
+    deactivateafter Outbound
+    
+    Consumer->>Kong: GET /mails/{mail_id} \n(인증 헤더 포함)
+    activate Kong
+    note over Kong: API Key 인가, Rate Limiting 통제
+    Kong->>Serving: GET /mails/{mail_id} 라우팅
+    activate Serving
+    note over Serving: ACL 검증
+
+    Serving->>Catalog: Catalog 마스터 테이블 로드 및 메타데이터 조회 (JDBC) (Replica 연결)
+    activate Catalog
+    Catalog-->>Serving: Gold 테이블 정의 및 최신 스냅샷 메타데이터 반환
+    deactivate Catalog
+
+    Serving->>MinIO: table.scan() 요청 (S3 API)
+    activate MinIO
+    note over MinIO: S3 Storage 필터 푸시다운 기동 (대상 Parquet 다이렉트 스캔)
+    MinIO-->>Serving: 메모리 DataFrame 로드 (비식별화 데이터 반환)
+    deactivate MinIO
+
+    Serving-->>Kong: 비식별화 데이터 반환
+    deactivate Serving
+    Kong-->>Consumer: 최종 JSON 응답 반송
+    deactivate Kong
+    deactivate Consumer

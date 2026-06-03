@@ -7,7 +7,7 @@ metadata:
   labels:
     {{- include "dl-poc.labels" . | nindent 4 }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.mocks.replicas }}
   selector:
     matchLabels:
       {{- include "dl-poc.selectorLabels" . | nindent 6 }}
@@ -18,6 +18,14 @@ spec:
         {{- include "dl-poc.selectorLabels" . | nindent 8 }}
         app: supply-mock-service
     spec:
+      {{- with .Values.mocks.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.mocks.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       containers:
         - name: supply-mock-service
           image: {{ .Values.mocks.image.supplyMock }}
@@ -25,6 +33,8 @@ spec:
           ports:
             - containerPort: 8000
               name: http
+          resources:
+            {{- toYaml .Values.mocks.resources | nindent 12 }}
           env:
             - name: KAFKA_BOOTSTRAP_SERVERS
               value: {{ include "dl-poc.kafkaBootstrap" . | quote }}
